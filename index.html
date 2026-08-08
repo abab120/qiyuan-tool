@@ -1,9 +1,10 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>栾悄工具箱</title>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <title>柒悁工具箱</title>
 
   <style>
     * {
@@ -12,20 +13,30 @@
       padding: 0;
     }
 
+    html {
+      scroll-behavior: smooth;
+    }
+
     body {
-      font-family: "Microsoft YaHei", sans-serif;
+      font-family: "Microsoft YaHei", "PingFang SC", sans-serif;
       background: #f5f7fb;
       color: #222;
       line-height: 1.7;
     }
 
+    /* 顶部导航 */
     header {
-      background: #ffffff;
+      background: rgba(255, 255, 255, 0.95);
       border-bottom: 1px solid #e5e7eb;
       padding: 18px 40px;
+
       display: flex;
       justify-content: space-between;
       align-items: center;
+
+      position: sticky;
+      top: 0;
+      z-index: 100;
     }
 
     .logo {
@@ -36,40 +47,70 @@
     nav a {
       color: #555;
       text-decoration: none;
-      margin-left: 24px;
+      margin-left: 25px;
+      transition: 0.2s;
     }
 
     nav a:hover {
       color: #22a06b;
     }
 
+    /* 首页区域 */
     .hero {
       text-align: center;
-      padding: 90px 20px 60px;
+      padding: 100px 20px 80px;
+
+      background:
+        radial-gradient(circle at top, #e9fff5, transparent 45%),
+        #f5f7fb;
     }
 
     .hero h1 {
-      font-size: 48px;
-      margin-bottom: 16px;
+      font-size: 52px;
+      margin-bottom: 15px;
     }
 
-    .hero p {
-      color: #666;
-      font-size: 18px;
+    .hero .subtitle {
+      font-size: 20px;
+      color: #555;
+      margin-bottom: 10px;
+    }
+
+    .hero .description {
+      color: #777;
       max-width: 700px;
       margin: auto;
     }
 
+    /* 标签 */
+    .badges {
+      margin-top: 22px;
+    }
+
+    .badge {
+      display: inline-block;
+      background: white;
+      border: 1px solid #e2e5e9;
+      border-radius: 20px;
+      padding: 5px 12px;
+      margin: 4px;
+      font-size: 13px;
+      color: #555;
+    }
+
+    /* 按钮 */
     .buttons {
       margin-top: 30px;
     }
 
     .btn {
       display: inline-block;
-      padding: 12px 24px;
+      padding: 12px 25px;
       margin: 6px;
+
       border-radius: 8px;
       text-decoration: none;
+
       transition: 0.2s;
     }
 
@@ -80,6 +121,7 @@
 
     .btn-primary:hover {
       background: #18895a;
+      transform: translateY(-2px);
     }
 
     .btn-secondary {
@@ -88,18 +130,31 @@
       border: 1px solid #ddd;
     }
 
+    .btn-secondary:hover {
+      background: #f4f4f4;
+      transform: translateY(-2px);
+    }
+
+    /* 通用区域 */
     .section {
       max-width: 1100px;
       margin: auto;
-      padding: 60px 20px;
+      padding: 70px 20px;
     }
 
     .section h2 {
       text-align: center;
       font-size: 32px;
+      margin-bottom: 12px;
+    }
+
+    .section-title-text {
+      text-align: center;
+      color: #777;
       margin-bottom: 35px;
     }
 
+    /* 功能卡片 */
     .features {
       display: grid;
       grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
@@ -108,10 +163,22 @@
 
     .card {
       background: white;
-      border-radius: 12px;
-      padding: 24px;
+      border-radius: 14px;
+      padding: 25px;
+
       border: 1px solid #e6e9ef;
-      box-shadow: 0 6px 18px rgba(0,0,0,0.04);
+
+      box-shadow:
+        0 6px 20px rgba(0, 0, 0, 0.04);
+
+      transition: 0.2s;
+    }
+
+    .card:hover {
+      transform: translateY(-4px);
+
+      box-shadow:
+        0 10px 30px rgba(0, 0, 0, 0.08);
     }
 
     .card h3 {
@@ -124,6 +191,27 @@
       font-size: 14px;
     }
 
+    /* 项目介绍 */
+    .about-box {
+      background: white;
+      padding: 35px;
+
+      border-radius: 14px;
+      border: 1px solid #e6e9ef;
+
+      text-align: center;
+
+      box-shadow:
+        0 6px 20px rgba(0, 0, 0, 0.04);
+    }
+
+    .about-box p {
+      color: #666;
+      max-width: 800px;
+      margin: auto;
+    }
+
+    /* 软件截图 */
     .screenshot {
       text-align: center;
     }
@@ -131,20 +219,51 @@
     .screenshot img {
       width: 100%;
       max-width: 1000px;
-      border-radius: 12px;
+
+      border-radius: 14px;
       border: 1px solid #ddd;
-      box-shadow: 0 10px 30px rgba(0,0,0,0.08);
+
+      box-shadow:
+        0 15px 40px rgba(0, 0, 0, 0.10);
     }
 
+    /* 下载 */
+    .download-box {
+      text-align: center;
+      background: white;
+
+      border: 1px solid #e6e9ef;
+      border-radius: 14px;
+
+      padding: 45px 20px;
+    }
+
+    .download-box h3 {
+      font-size: 25px;
+      margin-bottom: 10px;
+    }
+
+    .download-box p {
+      color: #777;
+      margin-bottom: 20px;
+    }
+
+    /* 页脚 */
     footer {
       text-align: center;
+
       padding: 35px 20px;
+
       color: #888;
+
       border-top: 1px solid #e5e7eb;
+
       background: white;
     }
 
-    @media (max-width: 600px) {
+    /* 手机适配 */
+    @media (max-width: 650px) {
+
       header {
         padding: 15px 20px;
       }
@@ -153,36 +272,91 @@
         display: none;
       }
 
-      .hero h1 {
-        font-size: 36px;
+      .hero {
+        padding: 70px 20px 60px;
       }
+
+      .hero h1 {
+        font-size: 38px;
+      }
+
+      .hero .subtitle {
+        font-size: 17px;
+      }
+
+      .section {
+        padding: 50px 15px;
+      }
+
     }
   </style>
 </head>
 
+
 <body>
 
+
+<!-- 顶部导航 -->
 <header>
-  <div class="logo">🧰 栾悄工具箱</div>
+
+  <div class="logo">
+    🧰 柒悁工具箱
+  </div>
 
   <nav>
     <a href="#about">介绍</a>
     <a href="#features">功能</a>
     <a href="#preview">截图</a>
+    <a href="#download">下载</a>
   </nav>
+
 </header>
 
-<section class="hero">
-  <h1>栾悄工具箱</h1>
 
-  <p>
-    一个简洁、实用的 Windows 多功能工具箱，
-    集成 AI 助手、自动点击、进程管理、文件处理、
-    局域网传输等常用功能。
+
+<!-- 首页 -->
+<section class="hero">
+
+  <h1>柒悁工具箱</h1>
+
+  <div class="subtitle">
+    一个简洁、实用的 Windows 多功能工具箱
+  </div>
+
+  <p class="description">
+    集成 AI 助手、自动点击、反应力测试、进程管理、
+    文件处理、局域网传输、EXE 打包等常用功能。
   </p>
 
+  <div class="badges">
+
+    <span class="badge">
+      🚀 v1.2
+    </span>
+
+    <span class="badge">
+      🪟 Windows
+    </span>
+
+    <span class="badge">
+      💻 64-bit
+    </span>
+
+    <span class="badge">
+      🛠 持续开发
+    </span>
+
+  </div>
+
+
   <div class="buttons">
-    <a class="btn btn-primary" href="#">下载最新版</a>
+
+    <a
+      class="btn btn-primary"
+      href="#download"
+    >
+      ⬇ 下载最新版
+    </a>
 
     <a
       class="btn btn-secondary"
@@ -191,104 +365,264 @@
     >
       GitHub
     </a>
+
   </div>
+
 </section>
 
-<section class="section" id="about">
-  <h2>项目介绍</h2>
 
-  <div class="card">
+
+<!-- 项目介绍 -->
+<section
+  class="section"
+  id="about"
+>
+
+  <h2>📖 项目介绍</h2>
+
+  <p class="section-title-text">
+    一个程序，解决更多日常需求
+  </p>
+
+  <div class="about-box">
+
     <p>
-      栾悄工具箱是一个 Windows 桌面效率工具合集，
-      主要用于整合日常使用中的各种小工具。
-      希望通过一个程序完成 AI、自动化、进程管理、
-      文件处理以及局域网传输等操作。
+      <strong>柒悁工具箱</strong>
+      是一个面向 Windows 的桌面效率工具合集。
+
+      将日常使用中的各种小工具集中到一个程序中，
+      减少安装大量独立软件以及频繁切换程序的麻烦。
+
+      目前包含 AI、自动化、测试、进程管理、
+      文件处理、局域网传输以及开发辅助等功能。
     </p>
+
   </div>
+
 </section>
 
-<section class="section" id="features">
-  <h2>主要功能</h2>
+
+
+<!-- 功能 -->
+<section
+  class="section"
+  id="features"
+>
+
+  <h2>✨ 主要功能</h2>
+
+  <p class="section-title-text">
+    常用功能集中在一个工具箱
+  </p>
+
 
   <div class="features">
 
-    <div class="card">
-      <h3>🤖 AI 助手</h3>
-      <p>
-        支持自定义 API 地址、API Key、模型名称、
-        Temperature 以及 AI 人格。
-      </p>
-    </div>
 
     <div class="card">
-      <h3>🖱️ 自动点击</h3>
+
+      <h3>
+        🤖 AI 助手
+      </h3>
+
       <p>
-        提供鼠标自动点击功能，
-        适合需要重复点击的操作场景。
+        支持自定义 API 地址、API Key、
+        模型名称、Temperature
+        以及 AI 人格。
       </p>
+
     </div>
 
-    <div class="card">
-      <h3>🎯 点小球</h3>
-      <p>
-        一个简单的鼠标操作和反应能力小游戏。
-      </p>
-    </div>
+
 
     <div class="card">
-      <h3>⚡ 反应力测试</h3>
+
+      <h3>
+        🖱️ 自动点击
+      </h3>
+
       <p>
-        测试你的点击速度和反应时间。
+        提供鼠标自动连续点击功能，
+        适合各种需要重复点击的场景。
       </p>
+
     </div>
 
-    <div class="card">
-      <h3>🧩 进程管理</h3>
-      <p>
-        查看和管理 Windows 当前运行的程序与进程。
-      </p>
-    </div>
+
 
     <div class="card">
-      <h3>📦 压缩包工具</h3>
+
+      <h3>
+        🎯 点小球
+      </h3>
+
       <p>
-        提供常用的文件压缩和解压辅助功能。
+        简单的鼠标操作小游戏，
+        测试点击速度与准确度。
       </p>
+
     </div>
 
-    <div class="card">
-      <h3>🌐 局域网传输</h3>
-      <p>
-        在同一局域网的设备之间快速传输文件。
-      </p>
-    </div>
+
 
     <div class="card">
-      <h3>🛠️ EXE 打包</h3>
+
+      <h3>
+        ⚡ 反应力测试
+      </h3>
+
       <p>
-        辅助将 Python 项目打包成 Windows EXE 程序。
+        测试你的点击反应时间，
+        看看你的反应到底有多快。
       </p>
+
     </div>
 
+
+
     <div class="card">
-      <h3>📚 常用库管理</h3>
+
+      <h3>
+        🧩 进程管理
+      </h3>
+
       <p>
-        快速查看、安装和管理常用 Python 库。
+        查看和管理 Windows
+        当前正在运行的程序与进程。
       </p>
+
     </div>
+
+
+
+    <div class="card">
+
+      <h3>
+        📦 压缩包工具
+      </h3>
+
+      <p>
+        提供常见文件压缩、
+        解压以及相关辅助功能。
+      </p>
+
+    </div>
+
+
+
+    <div class="card">
+
+      <h3>
+        🌐 局域网传输
+      </h3>
+
+      <p>
+        在同一个局域网的设备之间
+        快速进行文件传输。
+      </p>
+
+    </div>
+
+
+
+    <div class="card">
+
+      <h3>
+        🛠️ EXE 打包
+      </h3>
+
+      <p>
+        提供 Python 项目 EXE
+        打包辅助功能。
+      </p>
+
+    </div>
+
+
+
+    <div class="card">
+
+      <h3>
+        📚 常用库管理
+      </h3>
+
+      <p>
+        快速查看、安装和管理
+        常用 Python 第三方库。
+      </p>
+
+    </div>
+
 
   </div>
+
 </section>
 
-<section class="section screenshot" id="preview">
-  <h2>软件截图</h2>
 
-  <img src="toolbox.png" alt="栾悄工具箱截图" />
+
+<!-- 软件截图 -->
+<section
+  class="section screenshot"
+  id="preview"
+>
+
+  <h2>🖼️ 软件截图</h2>
+
+  <p class="section-title-text">
+    柒悁工具箱 v1.2
+  </p>
+
+  <img
+    src="toolbox.png"
+    alt="柒悁工具箱软件截图"
+  >
+
 </section>
 
+
+
+<!-- 下载 -->
+<section
+  class="section"
+  id="download"
+>
+
+  <div class="download-box">
+
+    <h3>
+      🚀 下载柒悁工具箱
+    </h3>
+
+    <p>
+      当前版本：v1.2 · Windows 64 位
+    </p>
+
+    <a
+      class="btn btn-primary"
+      href="#"
+    >
+      ⬇ 下载最新版
+    </a>
+
+  </div>
+
+</section>
+
+
+
+<!-- 页脚 -->
 <footer>
-  © 2026 栾悄工具箱 · v1.2 · Windows 64 位
+
+  <p>
+    © 2026 柒悁工具箱
+  </p>
+
+  <p>
+    v1.2 · Windows 64 位
+  </p>
+
 </footer>
+
 
 </body>
 </html>
