@@ -1,215 +1,294 @@
-<div align="center">
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>栾悄工具箱</title>
 
-<h1>🧰 栾悄工具箱</h1>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
 
-<h3>一个简洁、实用的 Windows 多功能工具箱</h3>
+    body {
+      font-family: "Microsoft YaHei", sans-serif;
+      background: #f5f7fb;
+      color: #222;
+      line-height: 1.7;
+    }
 
-<p>
-集成 AI 助手、自动化、进程管理、文件处理、局域网传输等常用功能。
-</p>
+    header {
+      background: #ffffff;
+      border-bottom: 1px solid #e5e7eb;
+      padding: 18px 40px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
 
-<p>
-<img src="https://img.shields.io/badge/version-v1.2-blue">
-<img src="https://img.shields.io/badge/platform-Windows-0078D6">
-<img src="https://img.shields.io/badge/arch-64--bit-green">
-<img src="https://img.shields.io/badge/status-开发中-orange">
-</p>
+    .logo {
+      font-size: 22px;
+      font-weight: bold;
+    }
 
-</div>
+    nav a {
+      color: #555;
+      text-decoration: none;
+      margin-left: 24px;
+    }
 
-<hr>
+    nav a:hover {
+      color: #22a06b;
+    }
 
-<h2>📖 项目简介</h2>
+    .hero {
+      text-align: center;
+      padding: 90px 20px 60px;
+    }
 
-<p>
-<b>栾悄工具箱</b> 是一个面向 Windows 的桌面效率工具合集。
-</p>
+    .hero h1 {
+      font-size: 48px;
+      margin-bottom: 16px;
+    }
 
-<p>
-项目希望把日常使用的各种小工具集中到一个程序中，
-减少安装多个软件以及频繁切换程序的麻烦。
-</p>
+    .hero p {
+      color: #666;
+      font-size: 18px;
+      max-width: 700px;
+      margin: auto;
+    }
 
-<h2>✨ 主要功能</h2>
+    .buttons {
+      margin-top: 30px;
+    }
 
-<table>
-<tr>
-<td width="33%" align="center">
-<h3>🤖 AI 助手</h3>
-<p>支持自定义 API、模型、Temperature 和 AI 人格。</p>
-</td>
+    .btn {
+      display: inline-block;
+      padding: 12px 24px;
+      margin: 6px;
+      border-radius: 8px;
+      text-decoration: none;
+      transition: 0.2s;
+    }
 
-<td width="33%" align="center">
-<h3>🖱️ 自动点击</h3>
-<p>提供鼠标自动连续点击功能。</p>
-</td>
+    .btn-primary {
+      background: #22a06b;
+      color: white;
+    }
 
-<td width="33%" align="center">
-<h3>🎯 点小球</h3>
-<p>简单的鼠标操作与反应小游戏。</p>
-</td>
-</tr>
+    .btn-primary:hover {
+      background: #18895a;
+    }
 
-<tr>
-<td align="center">
-<h3>⚡ 反应力测试</h3>
-<p>测试鼠标点击反应速度。</p>
-</td>
+    .btn-secondary {
+      background: white;
+      color: #333;
+      border: 1px solid #ddd;
+    }
 
-<td align="center">
-<h3>🧩 进程管理</h3>
-<p>查看和管理 Windows 运行进程。</p>
-</td>
+    .section {
+      max-width: 1100px;
+      margin: auto;
+      padding: 60px 20px;
+    }
 
-<td align="center">
-<h3>📦 压缩包工具</h3>
-<p>提供常见文件压缩与解压功能。</p>
-</td>
-</tr>
+    .section h2 {
+      text-align: center;
+      font-size: 32px;
+      margin-bottom: 35px;
+    }
 
-<tr>
-<td align="center">
-<h3>🌐 局域网传输</h3>
-<p>在局域网设备之间快速传输文件。</p>
-</td>
+    .features {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 20px;
+    }
 
-<td align="center">
-<h3>🛠️ EXE 打包</h3>
-<p>辅助将 Python 项目打包为 EXE。</p>
-</td>
+    .card {
+      background: white;
+      border-radius: 12px;
+      padding: 24px;
+      border: 1px solid #e6e9ef;
+      box-shadow: 0 6px 18px rgba(0,0,0,0.04);
+    }
 
-<td align="center">
-<h3>📚 常用库管理</h3>
-<p>快速安装和管理常用 Python 库。</p>
-</td>
-</tr>
-</table>
+    .card h3 {
+      margin-bottom: 10px;
+      font-size: 20px;
+    }
 
-<h2>🖼️ 软件截图</h2>
+    .card p {
+      color: #666;
+      font-size: 14px;
+    }
 
-<div align="center">
+    .screenshot {
+      text-align: center;
+    }
 
-<img src="./assets/toolbox.png" width="900">
+    .screenshot img {
+      width: 100%;
+      max-width: 1000px;
+      border-radius: 12px;
+      border: 1px solid #ddd;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.08);
+    }
 
-</div>
+    footer {
+      text-align: center;
+      padding: 35px 20px;
+      color: #888;
+      border-top: 1px solid #e5e7eb;
+      background: white;
+    }
 
-<h2>🤖 AI 助手</h2>
+    @media (max-width: 600px) {
+      header {
+        padding: 15px 20px;
+      }
 
-<p>AI 助手支持自行配置：</p>
+      nav {
+        display: none;
+      }
 
-<ul>
-<li>API 接口地址</li>
-<li>API Key</li>
-<li>模型名称</li>
-<li>Temperature</li>
-<li>System Prompt / AI 人格</li>
-</ul>
+      .hero h1 {
+        font-size: 36px;
+      }
+    }
+  </style>
+</head>
 
-<p>
-支持兼容 OpenAI API 格式的接口。
-</p>
+<body>
 
-<blockquote>
-⚠️ API Key 属于敏感信息，请勿将自己的 API Key 上传到 GitHub。
-</blockquote>
+<header>
+  <div class="logo">🧰 栾悄工具箱</div>
 
-<h2>🚀 使用方法</h2>
+  <nav>
+    <a href="#about">介绍</a>
+    <a href="#features">功能</a>
+    <a href="#preview">截图</a>
+  </nav>
+</header>
 
-<h3>直接下载</h3>
+<section class="hero">
+  <h1>栾悄工具箱</h1>
 
-<p>
-进入仓库的 <b>Releases</b> 页面，下载最新 Windows 版本。
-</p>
+  <p>
+    一个简洁、实用的 Windows 多功能工具箱，
+    集成 AI 助手、自动点击、进程管理、文件处理、
+    局域网传输等常用功能。
+  </p>
 
-<h3>源码运行</h3>
+  <div class="buttons">
+    <a class="btn btn-primary" href="#">下载最新版</a>
 
-<pre>
-git clone https://github.com/abab120/qiyun-tool.git
-cd qiyun-tool
-</pre>
+    <a
+      class="btn btn-secondary"
+      href="https://github.com/abab120/qiyun-tool"
+      target="_blank"
+    >
+      GitHub
+    </a>
+  </div>
+</section>
 
-<h2>🗺️ 开发进度</h2>
+<section class="section" id="about">
+  <h2>项目介绍</h2>
 
-<table>
-<tr>
-<th>功能</th>
-<th>状态</th>
-</tr>
+  <div class="card">
+    <p>
+      栾悄工具箱是一个 Windows 桌面效率工具合集，
+      主要用于整合日常使用中的各种小工具。
+      希望通过一个程序完成 AI、自动化、进程管理、
+      文件处理以及局域网传输等操作。
+    </p>
+  </div>
+</section>
 
-<tr>
-<td>AI 助手</td>
-<td>✅ 已完成</td>
-</tr>
+<section class="section" id="features">
+  <h2>主要功能</h2>
 
-<tr>
-<td>自动点击</td>
-<td>✅ 已完成</td>
-</tr>
+  <div class="features">
 
-<tr>
-<td>点小球</td>
-<td>✅ 已完成</td>
-</tr>
+    <div class="card">
+      <h3>🤖 AI 助手</h3>
+      <p>
+        支持自定义 API 地址、API Key、模型名称、
+        Temperature 以及 AI 人格。
+      </p>
+    </div>
 
-<tr>
-<td>反应力测试</td>
-<td>✅ 已完成</td>
-</tr>
+    <div class="card">
+      <h3>🖱️ 自动点击</h3>
+      <p>
+        提供鼠标自动点击功能，
+        适合需要重复点击的操作场景。
+      </p>
+    </div>
 
-<tr>
-<td>进程管理</td>
-<td>✅ 已完成</td>
-</tr>
+    <div class="card">
+      <h3>🎯 点小球</h3>
+      <p>
+        一个简单的鼠标操作和反应能力小游戏。
+      </p>
+    </div>
 
-<tr>
-<td>压缩包工具</td>
-<td>✅ 已完成</td>
-</tr>
+    <div class="card">
+      <h3>⚡ 反应力测试</h3>
+      <p>
+        测试你的点击速度和反应时间。
+      </p>
+    </div>
 
-<tr>
-<td>局域网传输</td>
-<td>✅ 已完成</td>
-</tr>
+    <div class="card">
+      <h3>🧩 进程管理</h3>
+      <p>
+        查看和管理 Windows 当前运行的程序与进程。
+      </p>
+    </div>
 
-<tr>
-<td>EXE 打包</td>
-<td>✅ 已完成</td>
-</tr>
+    <div class="card">
+      <h3>📦 压缩包工具</h3>
+      <p>
+        提供常用的文件压缩和解压辅助功能。
+      </p>
+    </div>
 
-<tr>
-<td>常用库管理</td>
-<td>✅ 已完成</td>
-</tr>
+    <div class="card">
+      <h3>🌐 局域网传输</h3>
+      <p>
+        在同一局域网的设备之间快速传输文件。
+      </p>
+    </div>
 
-<tr>
-<td>在线更新</td>
-<td>🚧 开发中</td>
-</tr>
-</table>
+    <div class="card">
+      <h3>🛠️ EXE 打包</h3>
+      <p>
+        辅助将 Python 项目打包成 Windows EXE 程序。
+      </p>
+    </div>
 
-<h2>📌 当前版本</h2>
+    <div class="card">
+      <h3>📚 常用库管理</h3>
+      <p>
+        快速查看、安装和管理常用 Python 库。
+      </p>
+    </div>
 
-<p>
-<b>v1.2 · Windows 64 位</b>
-</p>
+  </div>
+</section>
 
-<p>
-项目仍在持续开发中，如果发现 Bug 或者有功能建议，
-欢迎提交 Issue。
-</p>
+<section class="section screenshot" id="preview">
+  <h2>软件截图</h2>
 
-<hr>
+  <img src="toolbox.png" alt="栾悄工具箱截图" />
+</section>
 
-<div align="center">
+<footer>
+  © 2026 栾悄工具箱 · v1.2 · Windows 64 位
+</footer>
 
-<h2>⭐ 栾悄工具箱</h2>
-
-<p>
-如果这个项目对你有帮助，欢迎给项目一个 ⭐ Star。
-</p>
-
-<p>
-<b>让常用的小工具，都放在一个地方。</b>
-</p>
-
-</div>
+</body>
+</html>
