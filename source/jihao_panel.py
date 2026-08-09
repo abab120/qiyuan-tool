@@ -1,6 +1,8 @@
 import math
+import json
 import random
 import time
+from pathlib import Path
 
 from PyQt5.QtCore import QTimer, Qt
 from PyQt5.QtGui import QColor, QFont, QPainter, QPen
@@ -9,6 +11,9 @@ from PyQt5.QtWidgets import (
     QHBoxLayout,
     QLabel,
     QLineEdit,
+    QComboBox,
+    QFileDialog,
+    QMessageBox,
     QPushButton,
     QVBoxLayout,
     QWidget,
@@ -76,35 +81,97 @@ class HeartCanvas(QWidget):
 
 
 class JihaoPanel(QWidget):
+    TEMPLATES = [
+        ("日常祝福", "嘉豪，愿你每天都开心！"),
+        ("表白告白", "遇见你，是我最幸运的事。"),
+        ("生日祝福", "生日快乐，愿所有美好如期而至！"),
+        ("感谢陪伴", "谢谢你的陪伴，未来也请多多指教！"),
+        ("温柔寄语", "愿你一路有光，所遇皆温柔。"),
+        ("自定义", ""),
+    ]
+
     def __init__(self, parent=None):
         super().__init__(parent)
         layout = QVBoxLayout(self)
         layout.setContentsMargins(20, 18, 20, 18)
         layout.setSpacing(12)
 
-        title = QLabel("嘉豪专用")
+        title = QLabel("嘉豪专区")
         title.setObjectName("contentTitle")
-        subtitle = QLabel("制作一颗会跳动的爱心，输入文字后即可生成专属祝福")
+        subtitle = QLabel("选择模板或输入文字，生成可分享的爱心祝福")
         subtitle.setObjectName("contentStatus")
         layout.addWidget(title)
         layout.addWidget(subtitle)
 
-        controls = QGroupBox("自定义文字")
-        controls_layout = QHBoxLayout(controls)
+        controls = QGroupBox("祝福内容")
+        controls_layout = QVBoxLayout(controls)
+        template_row = QHBoxLayout()
+        template_row.addWidget(QLabel("模板"))
+        self.template_box = QComboBox()
+        for name, text in self.TEMPLATES:
+            self.template_box.addItem(name, text)
+        self.template_box.currentIndexChanged.connect(self._apply_template)
+        template_row.addWidget(self.template_box, 1)
+        controls_layout.addLayout(template_row)
+
+        text_row = QHBoxLayout()
+        text_row.addWidget(QLabel("文字"))
         self.text_edit = QLineEdit("嘉豪，愿你每天都开心！")
         self.text_edit.setPlaceholderText("输入要显示在爱心下方的文字")
-        controls_layout.addWidget(self.text_edit, 1)
+        text_row.addWidget(self.text_edit, 1)
+        controls_layout.addLayout(text_row)
+
+        button_row = QHBoxLayout()
         self.start_button = QPushButton("暂停")
         self.start_button.clicked.connect(self.toggle)
-        controls_layout.addWidget(self.start_button)
+        button_row.addWidget(self.start_button)
         reset_button = QPushButton("重新开始")
         reset_button.clicked.connect(self.reset)
-        controls_layout.addWidget(reset_button)
+        button_row.addWidget(reset_button)
+        export_button = QPushButton("导出代码")
+        export_button.setObjectName("primaryAction")
+        export_button.clicked.connect(self.export_code)
+        button_row.addWidget(export_button)
+        button_row.addStretch(1)
+        controls_layout.addLayout(button_row)
         layout.addWidget(controls)
 
         self.canvas = HeartCanvas(self)
         self.text_edit.textChanged.connect(self.canvas.set_message)
         layout.addWidget(self.canvas, 1)
+
+    def _apply_template(self, index):
+        text = self.template_box.itemData(index)
+        if text:
+            self.text_edit.setText(text)
+
+    def _export_html(self, message):
+        encoded = json.dumps(message, ensure_ascii=False).replace("</", "<\\/")
+        return f'''<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>嘉豪专区</title>
+<style>html,body{{margin:0;width:100%;height:100%;overflow:hidden;background:#171b24;color:#ffe1ec;font-family:"Microsoft YaHei",sans-serif}}canvas{{display:block;width:100%;height:100%}}#message{{position:fixed;left:0;right:0;bottom:9%;text-align:center;font-size:clamp(18px,3vw,30px);font-weight:700;text-shadow:0 2px 14px #f2588f}}</style></head>
+<body><canvas id="heart"></canvas><div id="message"></div>
+<script>
+const message={encoded};document.getElementById("message").textContent=message;
+const canvas=document.getElementById("heart"),ctx=canvas.getContext("2d"),dots=[];let t0=performance.now();
+function resize(){{const d=devicePixelRatio||1;canvas.width=innerWidth*d;canvas.height=innerHeight*d;ctx.setTransform(d,0,0,d,0,0)}}
+function heart(t){{return [16*Math.sin(t)**3,13*Math.cos(t)-5*Math.cos(2*t)-2*Math.cos(3*t)-Math.cos(4*t)]}}
+for(let i=0;i<900;i++)dots.push([Math.random()*Math.PI*2,.72+Math.random()*.31,Math.random()*6.28,1.2+Math.random()*1.8]);
+function draw(now){{const e=(now-t0)/1000,pulse=1+.035*Math.sin(e*3.2),s=Math.min(innerWidth,innerHeight)*.0145,cx=innerWidth/2,cy=innerHeight*.43;ctx.clearRect(0,0,innerWidth,innerHeight);for(const d of dots){{const p=heart(d[0]),drift=Math.sin(e*2+d[2])*.22,x=cx+(p[0]*d[1]+drift)*s*pulse,y=cy-p[1]*d[1]*s*pulse,a=.45+.35*(.5+.5*Math.sin(e*2.8+d[2]));ctx.fillStyle=`rgba(242,88,143,${{a}})`;ctx.beginPath();ctx.arc(x,y,d[3],0,Math.PI*2);ctx.fill()}}requestAnimationFrame(draw)}}
+addEventListener("resize",resize);resize();requestAnimationFrame(draw);
+</script></body></html>'''
+
+    def export_code(self):
+        path, _ = QFileDialog.getSaveFileName(self, "导出爱心代码", "嘉豪专区.html", "HTML 文件 (*.html)")
+        if not path:
+            return
+        try:
+            Path(path).write_text(self._export_html(self.text_edit.text()), encoding="utf-8")
+        except OSError as exc:
+            QMessageBox.warning(self, "导出失败", f"无法写入文件：{exc}")
+            return
+        QMessageBox.information(self, "导出完成", "爱心代码已导出为 HTML 文件，可直接用浏览器打开或分享。")
 
     def toggle(self):
         running = not self.canvas.running
