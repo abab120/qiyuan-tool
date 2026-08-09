@@ -12,8 +12,12 @@ from urllib.parse import urlparse
 from pathlib import Path
 
 import requests
+import urllib3
 from PyQt5.QtCore import QThread, QTimer, Qt, pyqtSignal
 from PyQt5.QtWidgets import QMessageBox, QApplication, QProgressDialog
+
+
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 
 CURRENT_VERSION = "1.0.0"
@@ -140,13 +144,16 @@ def _mirror_urls(url):
     return [f"https://gh-proxy.com/{url}"]
 
 
-def _parallel_download(url, output_path, progress):
+def _parallel_download(url, output_path, progress, expected_digest):
     """Download a ranged asset concurrently; return False when Range is unsupported."""
+    if not expected_digest:
+        return False
     probe = requests.get(
         url,
         stream=True,
         headers={"Range": "bytes=0-0", "User-Agent": "QiyuanToolbox"},
-        timeout=(8, 20),
+        timeout=(8, 10),
+        verify=False,
     )
     try:
         if probe.status_code != 206:
@@ -178,7 +185,8 @@ def _parallel_download(url, output_path, progress):
                 "Range": f"bytes={start}-{end}",
                 "User-Agent": "QiyuanToolbox",
             },
-            timeout=(8, 30),
+            timeout=(8, 10),
+            verify=False,
         )
         try:
             if response.status_code != 206:
@@ -259,7 +267,7 @@ class DownloadWorker(QThread):
             for url in urls:
                 try:
                     temp_path.unlink(missing_ok=True)
-                    if _parallel_download(url, temp_path, self.progress.emit):
+                    if _parallel_download(url, temp_path, self.progress.emit, expected):
                         digest = hashlib.sha256(temp_path.read_bytes())
                         if expected and digest.hexdigest().lower() != expected:
                             raise ValueError("下载文件校验失败")
