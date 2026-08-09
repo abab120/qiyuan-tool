@@ -211,7 +211,7 @@ def _install_process_manager():
 _install_process_manager()
 
 
-CURRENT_VERSION = "1.2.3"
+CURRENT_VERSION = "1.2.4"
 OPEN_SOURCE_URL = "https://github.com/abab120/qiyuan-tool"
 
 
@@ -241,6 +241,9 @@ class AboutPanel(QWidget):
         self.changelog.setReadOnly(True)
         self.changelog.setMaximumHeight(190)
         self.changelog.setPlainText(
+            "v1.2.4\n"
+            "• 嘉豪专区改为视觉样式模板，增加留白和圆角画布\n"
+            "• 修复点小球窗口缩放后的目标偏移\n\n"
             "v1.2.3\n"
             "• 修复反应力测试误点后的颜色提示和等待时间重置\n\n"
             "v1.2.2\n"
@@ -1026,7 +1029,13 @@ def main():
         }
         QGroupBox {
             border-radius: 12px;
-            padding: 14px 12px 12px;
+            margin-top: 20px;
+            padding: 18px 16px 16px;
+        }
+        QGroupBox::title {
+            subcontrol-origin: margin;
+            left: 14px;
+            padding: 0 6px;
         }
         QListWidget#sidebarNav::item {
             padding: 11px 14px;
