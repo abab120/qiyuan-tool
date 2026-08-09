@@ -1,4 +1,5 @@
 import marshal
+import ctypes
 import os
 import shutil
 import sys
@@ -59,10 +60,19 @@ tool = load_raw("tool")
 def _acquire_instance_guard():
     """Return a process-held lock, or an explanatory message when already open."""
     current_pid = os.getpid()
+    try:
+        bootloader_pid = psutil.Process(current_pid).ppid()
+    except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
+        bootloader_pid = 0
     process_names = {"toolbox", "toolbox.exe", "柒悁工具箱", "柒悁工具箱.exe"}
-    for proc in psutil.process_iter(["pid", "name"]):
+    for proc in psutil.process_iter(["pid", "name", "ppid"]):
         try:
-            if int(proc.info["pid"]) != current_pid and (proc.info.get("name") or "").lower() in process_names:
+            pid = int(proc.info["pid"])
+            # PyInstaller one-file builds briefly have a bootloader parent and
+            # a child process with the same executable name. They are one launch.
+            if pid in {current_pid, bootloader_pid} or int(proc.info.get("ppid") or 0) == current_pid:
+                continue
+            if (proc.info.get("name") or "").lower() in process_names:
                 return None, "检测到柒悁工具箱已在后台运行，不允许多开。"
         except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess, TypeError, ValueError):
             continue
@@ -201,7 +211,7 @@ def _install_process_manager():
 _install_process_manager()
 
 
-CURRENT_VERSION = "1.2.1"
+CURRENT_VERSION = "1.2.2"
 OPEN_SOURCE_URL = "https://github.com/abab120/qiyuan-tool"
 
 
@@ -231,6 +241,10 @@ class AboutPanel(QWidget):
         self.changelog.setReadOnly(True)
         self.changelog.setMaximumHeight(190)
         self.changelog.setPlainText(
+            "v1.2.2\n"
+            "• 嘉豪专区增加多种模板并支持导出 HTML 爱心代码\n"
+            "• 优化任务栏图标和单实例启动识别\n"
+            "• 123 网盘渠道改为确认更新后再启用\n\n"
             "v1.2.1\n"
             "• 增加嘉豪专用爱心文字模块，支持自定义显示文字\n"
             "• 增加后台进程检测，禁止程序多开\n"
@@ -904,7 +918,7 @@ def _load_panels(window):
 
     jihao = JihaoPanel(window)
     window.jihao_panel = jihao
-    window.tab_widget.addTab(jihao, "嘉豪专用")
+    window.tab_widget.addTab(jihao, "嘉豪专区")
 
     cleanup = ProDiskCleanupPanel(window)
     window.cleanup_panel = cleanup
@@ -912,6 +926,11 @@ def _load_panels(window):
     window.tab_widget.addTab(about, "关于")
 
 def main():
+    if sys.platform == "win32":
+        try:
+            ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID("Qiyuan.Toolbox")
+        except (AttributeError, OSError):
+            pass
     app = QApplication(sys.argv)
     if os.environ.get("QIYUAN_ALLOW_RELAUNCH") == "1":
         app._instance_guard = None
@@ -1023,6 +1042,8 @@ def main():
         window.setWindowIcon(QIcon(str(icon)))
 
     window.show()
+    if icon.exists():
+        window.setWindowIcon(QIcon(str(icon)))
     QTimer.singleShot(0, lambda: _load_panels(window))
     return app.exec_()
 
