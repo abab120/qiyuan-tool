@@ -719,15 +719,7 @@
       href="#"
       id="latest-download"
     >
-      ⬇ 下载 EXE
-    </a>
-
-    <a
-      class="btn btn-secondary"
-      href="#"
-      id="zip-download"
-    >
-      ⬇ 下载 ZIP
+      ⬇ 下载
     </a>
 
   </div>
@@ -760,19 +752,16 @@
     };
     const chooser = document.getElementById("download-chooser");
     const openButton = document.getElementById("latest-download");
-    const zipButton = document.getElementById("zip-download");
     const closeButton = document.getElementById("close-chooser");
     const description = document.getElementById("channel-description");
-    if (!chooser || !openButton || !zipButton || !closeButton) return;
+    if (!chooser || !openButton || !closeButton) return;
     Object.entries(links).forEach(([name, url]) => {
       const node = document.getElementById(name.replace(/([A-Z])/g, "-$1").toLowerCase());
       if (node) node.href = url;
     });
     const show = (event) => {
       event.preventDefault();
-      if (description) description.textContent = event.currentTarget === zipButton
-        ? "请选择渠道下载最新版 ZIP 压缩包。"
-        : "请选择速度更快或更稳定的渠道下载最新版 EXE。";
+      if (description) description.textContent = "请选择速度更快或更稳定的渠道下载最新版 EXE。";
       chooser.classList.add("active");
       chooser.setAttribute("aria-hidden", "false");
     };
@@ -781,7 +770,6 @@
       chooser.setAttribute("aria-hidden", "true");
     };
     openButton.addEventListener("click", show);
-    zipButton.addEventListener("click", show);
     closeButton.addEventListener("click", hide);
     chooser.addEventListener("click", (event) => {
       if (event.target === chooser) hide();
