@@ -44,7 +44,10 @@ from PyQt5.QtWidgets import (
     QTableWidgetItem,
     QTextEdit,
     QVBoxLayout,
+    QWidget,
 )
+from PyQt5.QtCore import QUrl
+from PyQt5.QtGui import QDesktopServices
 
 tool = load_raw("tool")
 ai_panel = load_raw("ai_panel")
@@ -180,6 +183,64 @@ def _install_process_manager():
 _install_process_manager()
 
 
+CURRENT_VERSION = "1.3.3"
+OPEN_SOURCE_URL = "https://github.com/abab120/qiyuan-tool"
+
+
+class AboutPanel(QWidget):
+    def __init__(self, updater, parent=None):
+        super().__init__(parent)
+        self.updater = updater
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(24, 22, 24, 22)
+        layout.setSpacing(14)
+
+        title = QLabel("关于柒悁工具箱")
+        title.setObjectName("contentTitle")
+        layout.addWidget(title)
+        subtitle = QLabel("版本、更新与开源信息")
+        subtitle.setObjectName("contentStatus")
+        layout.addWidget(subtitle)
+
+        info = QLabel(f"当前版本  v{CURRENT_VERSION}\n运行环境  Windows 64 位\n项目地址  github.com/abab120/qiyuan-tool")
+        info.setObjectName("aboutInfo")
+        layout.addWidget(info)
+
+        self.status = QLabel("更新状态：尚未检查")
+        self.status.setObjectName("contentStatus")
+        layout.addWidget(self.status)
+
+        buttons = QHBoxLayout()
+        self.check_button = QPushButton("检查更新")
+        self.check_button.clicked.connect(self.check_updates)
+        source_button = QPushButton("打开开源页面")
+        source_button.clicked.connect(lambda: QDesktopServices.openUrl(QUrl(OPEN_SOURCE_URL)))
+        buttons.addWidget(self.check_button)
+        buttons.addWidget(source_button)
+        buttons.addStretch(1)
+        layout.addLayout(buttons)
+        layout.addStretch(1)
+
+    def check_updates(self):
+        self.check_button.setEnabled(False)
+        self.status.setText("更新状态：正在检查...")
+        if not self.updater.check_now(self.on_checked, self.on_failed):
+            self.check_button.setEnabled(True)
+            self.status.setText("更新状态：已有检查任务")
+
+    def on_checked(self, manifest):
+        self.check_button.setEnabled(True)
+        if manifest and updater._version(manifest.get("version")) > updater._version(CURRENT_VERSION):
+            self.status.setText(f"更新状态：发现新版本 {manifest.get('version')}")
+            self.updater._offer(manifest)
+        else:
+            self.status.setText("更新状态：当前已是最新版本")
+
+    def on_failed(self, error):
+        self.check_button.setEnabled(True)
+        self.status.setText("更新状态：检查失败，请确认网络连接")
+
+
 def main():
     app = QApplication(sys.argv)
     app.setApplicationName("柒悁工具箱")
@@ -190,6 +251,9 @@ def main():
 
     window = tool.ToolBox()
     window.setStyleSheet(tool.WORKSPACE_STYLE)
+    for label in window.findChildren(QLabel):
+        if label.text().startswith("v1.2"):
+            label.setText(f"v{CURRENT_VERSION} · 64 位")
     if icon.exists():
         window.setWindowIcon(QIcon(str(icon)))
 
@@ -207,13 +271,16 @@ def main():
 
     assistant = mythware_panel.MythwarePanel(window)
     window.assistant_panel = assistant
-    window.tab_widget.addTab(assistant, "v1.2 助手")
+    window.tab_widget.addTab(assistant, "软件工具箱")
 
     ai = ai_panel.AIPanel(window)
     window.ai_panel = ai
     window.tab_widget.insertTab(0, ai, "AI 助手")
     window.tab_widget.setCurrentWidget(ai)
     window._updater = updater.Updater(window)
+    about = AboutPanel(window._updater, window)
+    window.about_panel = about
+    window.tab_widget.addTab(about, "关于")
     window._updater.schedule()
     window.show()
     return app.exec_()
