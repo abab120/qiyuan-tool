@@ -5,6 +5,8 @@ import subprocess
 import sys
 import tempfile
 import shutil
+import time
+from urllib.parse import urlparse
 from pathlib import Path
 
 import requests
@@ -116,12 +118,24 @@ def _read_release(data):
     digest = asset.get("digest", "")
     if digest.startswith("sha256:"):
         digest = digest[7:]
+    download_url = asset.get("browser_download_url")
     return {
         "version": version,
-        "url": asset.get("browser_download_url"),
+        "url": download_url,
+        "mirrors": _mirror_urls(download_url),
         "sha256": digest,
         "notes": data.get("body", ""),
     }
+
+
+def _mirror_urls(url):
+    """Return optional CDN URLs for GitHub assets, keeping the original URL as fallback."""
+    if not url:
+        return []
+    parsed = urlparse(str(url))
+    if parsed.scheme != "https" or parsed.netloc.lower() not in {"github.com", "www.github.com"}:
+        return []
+    return [f"https://gh-proxy.com/{url}"]
 
 
 class CheckWorker(QThread):
@@ -162,35 +176,70 @@ class DownloadWorker(QThread):
         fd, temp_name = tempfile.mkstemp(prefix="qj_toolbox_update_", suffix=".exe")
         os.close(fd)
         temp_path = Path(temp_name)
+        expected = str(self.manifest.get("sha256", "")).lower().replace("sha256:", "")
+        urls = []
+        for url in [*self.manifest.get("mirrors", []), self.manifest.get("url")]:
+            if url and url not in urls:
+                urls.append(url)
+        last_error = None
         try:
-            try:
-                response = requests.get(
-                    self.manifest["url"],
-                    stream=True,
-                    timeout=30,
-                    headers={"User-Agent": "QiyuanToolbox"},
-                )
-                response.raise_for_status()
-                total = int(response.headers.get("content-length", 0))
-                received = 0
-                digest = hashlib.sha256()
-                with temp_path.open("wb") as output:
-                    for chunk in response.iter_content(1024 * 256):
-                        if not chunk:
-                            continue
-                        output.write(chunk)
-                        digest.update(chunk)
-                        received += len(chunk)
-                        if total:
-                            self.progress.emit(min(100, received * 100 // total))
-            except requests.exceptions.RequestException:
-                _native_request(self.manifest["url"], temp_path)
-                digest = hashlib.sha256(temp_path.read_bytes())
-                self.progress.emit(100)
-            expected = str(self.manifest.get("sha256", "")).lower().replace("sha256:", "")
-            if expected and digest.hexdigest().lower() != expected:
-                raise ValueError("下载文件校验失败")
-            self.completed.emit(str(temp_path))
+            for url in urls:
+                try:
+                    temp_path.unlink(missing_ok=True)
+                    response = requests.get(
+                        url,
+                        stream=True,
+                        timeout=(8, 20),
+                        headers={"User-Agent": "QiyuanToolbox"},
+                    )
+                    response.raise_for_status()
+                    total = int(response.headers.get("content-length", 0))
+                    received = 0
+                    started = time.monotonic()
+                    digest = hashlib.sha256()
+                    with temp_path.open("wb") as output:
+                        for chunk in response.iter_content(1024 * 256):
+                            if not chunk:
+                                continue
+                            output.write(chunk)
+                            digest.update(chunk)
+                            received += len(chunk)
+                            if total:
+                                self.progress.emit(min(100, received * 100 // total))
+                            # Move to the next route when a CDN is accepting the
+                            # connection but delivering unusably slowly.
+                            elapsed = time.monotonic() - started
+                            if received >= 512 * 1024 and elapsed >= 6 and received / elapsed < 96 * 1024:
+                                raise TimeoutError("当前下载线路速度过慢")
+                    if expected and digest.hexdigest().lower() != expected:
+                        raise ValueError("下载文件校验失败")
+                    self.progress.emit(100)
+                    self.completed.emit(str(temp_path))
+                    return
+                except requests.exceptions.RequestException as exc:
+                    # If Python's TLS stack is unavailable, retry this route
+                    # through Windows' Schannel-backed curl/PowerShell client.
+                    try:
+                        temp_path.unlink(missing_ok=True)
+                        _native_request(url, temp_path)
+                        digest = hashlib.sha256(temp_path.read_bytes())
+                        if expected and digest.hexdigest().lower() != expected:
+                            raise ValueError("下载文件校验失败")
+                        self.progress.emit(100)
+                        self.completed.emit(str(temp_path))
+                        return
+                    except Exception as native_exc:
+                        last_error = native_exc
+                        continue
+                except (OSError, TimeoutError, ValueError) as exc:
+                    last_error = exc
+                    continue
+                except Exception as exc:
+                    last_error = exc
+                    continue
+            if last_error:
+                raise last_error
+            raise ValueError("没有可用的下载地址")
         except Exception as exc:
             try:
                 temp_path.unlink(missing_ok=True)
