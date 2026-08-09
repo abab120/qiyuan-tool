@@ -1,11 +1,14 @@
 # -*- mode: python ; coding: utf-8 -*-
 
+from pathlib import Path
+
+RUNTIME = Path(SPECPATH) / '柒悁工具箱'
 
 a = Analysis(
     ['main.py'],
     pathex=[],
     binaries=[],
-    datas=[('C:\\Users\\Administrator.SC-202011011119\\Desktop\\0\\柒悁工具箱\\tool.raw', '.'), ('C:\\Users\\Administrator.SC-202011011119\\Desktop\\0\\柒悁工具箱\\launcher.raw', '.'), ('C:\\Users\\Administrator.SC-202011011119\\Desktop\\0\\柒悁工具箱\\ai_panel.raw', '.'), ('C:\\Users\\Administrator.SC-202011011119\\Desktop\\0\\柒悁工具箱\\library_manager.raw', '.'), ('C:\\Users\\Administrator.SC-202011011119\\Desktop\\0\\柒悁工具箱\\mythware_panel.raw', '.'), ('C:\\Users\\Administrator.SC-202011011119\\Desktop\\0\\柒悁工具箱\\reaction_test.raw', '.'), ('C:\\Users\\Administrator.SC-202011011119\\Desktop\\0\\柒悁工具箱\\favicon.ico', '.')],
+    datas=[(str(RUNTIME / name), '.') for name in ('tool.raw', 'launcher.raw', 'ai_panel.raw', 'library_manager.raw', 'mythware_panel.raw', 'reaction_test.raw', 'favicon.ico')],
     hiddenimports=['pyautogui', 'pyzipper', 'psutil', 'PIL', 'cryptography', 'rarfile', 'requests'],
     hookspath=[],
     hooksconfig={},
@@ -35,5 +38,5 @@ exe = EXE(
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
-    icon=['C:\\Users\\Administrator.SC-202011011119\\Desktop\\0\\柒悁工具箱\\favicon.ico'],
+    icon=[str(RUNTIME / 'favicon.ico')],
 )
