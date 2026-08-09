@@ -29,7 +29,7 @@ def load_raw(name):
 import psutil  # noqa: F401
 import updater
 from PyQt5.QtGui import QIcon
-from PyQt5.QtCore import QThread, QTimer, Qt, pyqtSignal
+from PyQt5.QtCore import QLockFile, QThread, QTimer, Qt, pyqtSignal
 from PyQt5.QtWidgets import (
     QApplication,
     QAbstractItemView,
@@ -51,8 +51,28 @@ from PyQt5.QtWidgets import (
 )
 from PyQt5.QtCore import QUrl
 from PyQt5.QtGui import QDesktopServices
+from jihao_panel import JihaoPanel
 
 tool = load_raw("tool")
+
+
+def _acquire_instance_guard():
+    """Return a process-held lock, or an explanatory message when already open."""
+    current_pid = os.getpid()
+    process_names = {"toolbox", "toolbox.exe", "柒悁工具箱", "柒悁工具箱.exe"}
+    for proc in psutil.process_iter(["pid", "name"]):
+        try:
+            if int(proc.info["pid"]) != current_pid and (proc.info.get("name") or "").lower() in process_names:
+                return None, "检测到柒悁工具箱已在后台运行，不允许多开。"
+        except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess, TypeError, ValueError):
+            continue
+
+    lock_path = Path(tempfile.gettempdir()) / "qiyuan-toolbox-single-instance.lock"
+    lock = QLockFile(str(lock_path))
+    lock.setStaleLockTime(5000)
+    if not lock.tryLock(100):
+        return None, "检测到柒悁工具箱已在后台运行，不允许多开。"
+    return lock, None
 
 
 def _refresh_process_table(self):
@@ -878,6 +898,10 @@ def _load_panels(window):
     window.tab_widget.insertTab(0, ai, "AI 助手")
     window.tab_widget.setCurrentWidget(ai)
 
+    jihao = JihaoPanel(window)
+    window.jihao_panel = jihao
+    window.tab_widget.addTab(jihao, "嘉豪专用")
+
     cleanup = ProDiskCleanupPanel(window)
     window.cleanup_panel = cleanup
     window.tab_widget.addTab(cleanup, "磁盘清理")
@@ -885,6 +909,11 @@ def _load_panels(window):
 
 def main():
     app = QApplication(sys.argv)
+    instance_guard, instance_error = _acquire_instance_guard()
+    if instance_guard is None:
+        QMessageBox.warning(None, "柒悁工具箱", instance_error)
+        return 1
+    app._instance_guard = instance_guard
     app.setApplicationName("柒悁工具箱")
     app.setStyle("Fusion")
     icon = resource_path("favicon.ico")
@@ -893,7 +922,93 @@ def main():
 
     window = tool.ToolBox()
     window.setWindowTitle("柒悁工具箱")
-    window.setStyleSheet(tool.WORKSPACE_STYLE)
+    window.setStyleSheet(tool.WORKSPACE_STYLE + """
+        /* Shared rounded controls for the main workspace. */
+        QPushButton {
+            min-height: 32px;
+            padding: 4px 12px;
+            border: 1px solid #cfd8e3;
+            border-radius: 8px;
+            background: #ffffff;
+        }
+        QPushButton:hover {
+            border-color: #26a269;
+            background: #f0fbf5;
+        }
+        QLineEdit, QTextEdit, QPlainTextEdit, QComboBox,
+        QSpinBox, QDoubleSpinBox, QListWidget, QTableWidget {
+            border: 1px solid #cfd8e3;
+            border-radius: 8px;
+            background: #ffffff;
+            selection-background-color: #dff5e9;
+            selection-color: #183326;
+        }
+        QLineEdit, QComboBox, QSpinBox, QDoubleSpinBox {
+            min-height: 30px;
+            padding: 2px 8px;
+        }
+        QTextEdit, QPlainTextEdit, QListWidget, QTableWidget {
+            padding: 4px;
+        }
+        QTabWidget::pane {
+            border: 1px solid #dfe5ec;
+            border-radius: 10px;
+            background: #ffffff;
+            top: -1px;
+        }
+        QTabBar::tab {
+            min-height: 30px;
+            padding: 5px 13px;
+            border: 1px solid transparent;
+            border-radius: 8px 8px 0 0;
+        }
+        QTabBar::tab:selected {
+            color: #16754a;
+            background: #e8f7ef;
+            border-color: #bde5cf;
+        }
+        QProgressBar {
+            min-height: 12px;
+            border: 0;
+            border-radius: 6px;
+            background: #e8edf2;
+            text-align: center;
+        }
+        QProgressBar::chunk {
+            border-radius: 6px;
+            background: #20b875;
+        }
+        QScrollArea {
+            border: 0;
+            border-radius: 10px;
+        }
+        QFrame#sidebarFrame {
+            margin: 10px 0 10px 10px;
+            border: 1px solid #e4e7ec;
+            border-radius: 14px;
+        }
+        QFrame#contentFrame {
+            margin: 10px;
+            border: 1px solid #e4e7ec;
+            border-radius: 14px;
+        }
+        QFrame#contentHeader {
+            border-radius: 14px 14px 0 0;
+            padding: 4px 10px;
+        }
+        QGroupBox {
+            border-radius: 12px;
+            padding: 14px 12px 12px;
+        }
+        QListWidget#sidebarNav::item {
+            padding: 11px 14px;
+            margin: 3px 4px;
+            border-radius: 10px;
+        }
+        QTableWidget {
+            border-radius: 10px;
+        }
+    """)
     for label in window.findChildren(QLabel):
         if label.text().startswith("v1.2"):
             label.setText(f"v{CURRENT_VERSION} · 64 位")
