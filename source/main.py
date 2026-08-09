@@ -250,6 +250,7 @@ def main():
         app.setWindowIcon(QIcon(str(icon)))
 
     window = tool.ToolBox()
+    window.setWindowTitle("柒悁工具箱")
     window.setStyleSheet(tool.WORKSPACE_STYLE)
     for label in window.findChildren(QLabel):
         if label.text().startswith("v1.2"):
