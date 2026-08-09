@@ -11,7 +11,7 @@ from PyQt5.QtCore import QThread, QTimer, pyqtSignal
 from PyQt5.QtWidgets import QMessageBox, QApplication
 
 
-CURRENT_VERSION = "1.3.3"
+CURRENT_VERSION = "1.3.4"
 # Upload a toolbox EXE asset to this repository to publish updates.
 DEFAULT_RELEASE_API = "https://api.github.com/repos/abab120/qiyuan-tool/releases/latest"
 
@@ -39,6 +39,30 @@ def _manifest_url():
     except (OSError, ValueError, TypeError):
         pass
     return os.environ.get("QJ_TOOLBOX_UPDATE_URL", DEFAULT_RELEASE_API)
+
+
+def _powershell_request(url, output_path=None):
+    """Use Windows' Schannel certificate store when Python's CA bundle is unavailable."""
+    escaped_url = str(url).replace("'", "''")
+    if output_path is None:
+        script = (
+            "$ProgressPreference='SilentlyContinue'; "
+            f"(Invoke-WebRequest -UseBasicParsing -Uri '{escaped_url}' "
+            "-Headers @{Accept='application/json'; 'User-Agent'='QiyuanToolbox'}).Content"
+        )
+    else:
+        escaped_path = str(output_path).replace("'", "''")
+        script = (
+            "$ProgressPreference='SilentlyContinue'; "
+            f"Invoke-WebRequest -UseBasicParsing -Uri '{escaped_url}' -OutFile '{escaped_path}'"
+        )
+    result = subprocess.run(
+        ["powershell.exe", "-NoProfile", "-NonInteractive", "-Command", script],
+        capture_output=True,
+        timeout=30,
+        check=True,
+    )
+    return result.stdout.decode("utf-8-sig", errors="replace") if output_path is None else None
 
 
 def _read_release(data):
@@ -75,9 +99,17 @@ class CheckWorker(QThread):
 
     def run(self):
         try:
-            response = requests.get(_manifest_url(), timeout=8, headers={"Accept": "application/json"})
-            response.raise_for_status()
-            manifest = _read_release(response.json())
+            try:
+                response = requests.get(
+                    _manifest_url(),
+                    timeout=8,
+                    headers={"Accept": "application/json", "User-Agent": "QiyuanToolbox"},
+                )
+                response.raise_for_status()
+                payload = response.json()
+            except requests.exceptions.SSLError:
+                payload = json.loads(_powershell_request(_manifest_url()))
+            manifest = _read_release(payload)
             self.checked.emit(manifest)
             if manifest and _version(manifest.get("version")) > _version(CURRENT_VERSION):
                 self.found.emit(manifest)
@@ -97,20 +129,30 @@ class DownloadWorker(QThread):
     def run(self):
         temp_path = Path(tempfile.gettempdir()) / "qj_toolbox_update.exe"
         try:
-            response = requests.get(self.manifest["url"], stream=True, timeout=30)
-            response.raise_for_status()
-            total = int(response.headers.get("content-length", 0))
-            received = 0
-            digest = hashlib.sha256()
-            with temp_path.open("wb") as output:
-                for chunk in response.iter_content(1024 * 256):
-                    if not chunk:
-                        continue
-                    output.write(chunk)
-                    digest.update(chunk)
-                    received += len(chunk)
-                    if total:
-                        self.progress.emit(min(100, received * 100 // total))
+            try:
+                response = requests.get(
+                    self.manifest["url"],
+                    stream=True,
+                    timeout=30,
+                    headers={"User-Agent": "QiyuanToolbox"},
+                )
+                response.raise_for_status()
+                total = int(response.headers.get("content-length", 0))
+                received = 0
+                digest = hashlib.sha256()
+                with temp_path.open("wb") as output:
+                    for chunk in response.iter_content(1024 * 256):
+                        if not chunk:
+                            continue
+                        output.write(chunk)
+                        digest.update(chunk)
+                        received += len(chunk)
+                        if total:
+                            self.progress.emit(min(100, received * 100 // total))
+            except requests.exceptions.SSLError:
+                _powershell_request(self.manifest["url"], temp_path)
+                digest = hashlib.sha256(temp_path.read_bytes())
+                self.progress.emit(100)
             expected = str(self.manifest.get("sha256", "")).lower().replace("sha256:", "")
             if expected and digest.hexdigest().lower() != expected:
                 raise ValueError("下载文件校验失败")
