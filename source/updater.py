@@ -42,7 +42,7 @@ def _manifest_url():
     return os.environ.get("QJ_TOOLBOX_UPDATE_URL", DEFAULT_RELEASE_API)
 
 
-def _run_hidden(args):
+def _run_hidden(args, timeout=30):
     startupinfo = None
     if sys.platform == "win32":
         startupinfo = subprocess.STARTUPINFO()
@@ -51,7 +51,7 @@ def _run_hidden(args):
     return subprocess.run(
         args,
         capture_output=True,
-        timeout=30,
+        timeout=timeout,
         startupinfo=startupinfo,
         creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
         check=True,
@@ -75,6 +75,7 @@ def _powershell_request(url, output_path=None):
         )
     result = _run_hidden(
         ["powershell.exe", "-NoProfile", "-NonInteractive", "-Command", script],
+        timeout=300 if output_path is not None else 30,
     )
     return result.stdout.decode("utf-8-sig", errors="replace") if output_path is None else None
 
@@ -89,7 +90,7 @@ def _native_request(url, output_path=None):
         else:
             args.extend(["--output", str(output_path), str(url)])
         try:
-            result = _run_hidden(args)
+            result = _run_hidden(args, timeout=300 if output_path is not None else 30)
             return result.stdout.decode("utf-8-sig", errors="replace") if output_path is None else None
         except (OSError, subprocess.CalledProcessError):
             pass
