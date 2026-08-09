@@ -211,7 +211,7 @@ def _install_process_manager():
 _install_process_manager()
 
 
-CURRENT_VERSION = "1.2.2"
+CURRENT_VERSION = "1.2.3"
 OPEN_SOURCE_URL = "https://github.com/abab120/qiyuan-tool"
 
 
@@ -241,6 +241,8 @@ class AboutPanel(QWidget):
         self.changelog.setReadOnly(True)
         self.changelog.setMaximumHeight(190)
         self.changelog.setPlainText(
+            "v1.2.3\n"
+            "• 修复反应力测试误点后的颜色提示和等待时间重置\n\n"
             "v1.2.2\n"
             "• 嘉豪专区增加多种模板并支持导出 HTML 爱心代码\n"
             "• 优化任务栏图标和单实例启动识别\n"
