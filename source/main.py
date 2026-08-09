@@ -431,6 +431,13 @@ class DiskCleanupPanel(QWidget):
 
 
 def _load_panels(window):
+    # Start the update request before loading the heavier feature panels.
+    window._updater = updater.Updater(window)
+    about = AboutPanel(window._updater, window)
+    window.about_panel = about
+    window.tab_widget.addTab(about, "关于")
+    window._updater.check()
+
     launcher = load_raw("launcher")
     reaction_test = load_raw("reaction_test")
     library_manager = load_raw("library_manager")
@@ -461,13 +468,6 @@ def _load_panels(window):
     cleanup = DiskCleanupPanel(window)
     window.cleanup_panel = cleanup
     window.tab_widget.addTab(cleanup, "磁盘清理")
-
-    window._updater = updater.Updater(window)
-    about = AboutPanel(window._updater, window)
-    window.about_panel = about
-    window.tab_widget.addTab(about, "关于")
-    window._updater.schedule()
-
 
 def main():
     app = QApplication(sys.argv)
