@@ -34,6 +34,7 @@ from PyQt5.QtWidgets import (
     QApplication,
     QAbstractItemView,
     QCheckBox,
+    QComboBox,
     QFrame,
     QGridLayout,
     QHBoxLayout,
@@ -41,6 +42,7 @@ from PyQt5.QtWidgets import (
     QMessageBox,
     QPushButton,
     QProgressBar,
+    QScrollArea,
     QTableWidget,
     QTableWidgetItem,
     QTextEdit,
@@ -179,7 +181,7 @@ def _install_process_manager():
 _install_process_manager()
 
 
-CURRENT_VERSION = "1.1.0"
+CURRENT_VERSION = "1.2.0"
 OPEN_SOURCE_URL = "https://github.com/abab120/qiyuan-tool"
 
 
@@ -512,6 +514,48 @@ class ProDiskCleanupWorker(QThread):
 
 
 class ProDiskCleanupPanel(QWidget):
+    @staticmethod
+    def _available_drives():
+        drives = []
+        seen = set()
+        for part in psutil.disk_partitions(all=False):
+            root = Path(part.mountpoint)
+            try:
+                key = str(root.resolve()).lower()
+            except OSError:
+                continue
+            if key in seen or not root.exists():
+                continue
+            seen.add(key)
+            label = part.device or str(root)
+            if part.fstype:
+                label = f"{label} ({part.fstype})"
+            drives.append((root, label))
+        if not drives:
+            root = Path(os.environ.get("SystemDrive", "C:\\"))
+            drives.append((root, str(root)))
+        return drives
+
+    def _targets_for_drive(self, root):
+        try:
+            is_system = root.resolve() == self._system_drive.resolve()
+        except OSError:
+            is_system = str(root).lower() == str(self._system_drive).lower()
+        if is_system:
+            return [dict(target, paths=list(target["paths"])) for target in self._system_targets]
+        drive_name = root.drive or str(root)
+        return [
+            {"key": "system", "name": f"{drive_name} 临时文件", "description": "该磁盘 Temp、tmp 和 Windows 临时目录", "paths": [root / "Temp", root / "tmp", root / "Windows" / "Temp"], "kind": "tree", "default": True, "min_age_seconds": 900},
+            {"key": "browser", "name": "浏览器缓存", "description": "该磁盘未发现浏览器缓存目录", "paths": [], "kind": "tree", "default": False},
+            {"key": "wechat", "name": "微信缓存", "description": "该磁盘未发现微信缓存目录", "paths": [], "kind": "tree", "default": False},
+            {"key": "qq", "name": "QQ 缓存", "description": "该磁盘未发现 QQ 缓存目录", "paths": [], "kind": "tree", "default": False},
+            {"key": "thumbs", "name": "缩略图缓存", "description": "该磁盘未发现缩略图缓存", "paths": [], "kind": "glob", "pattern": "thumbcache*.db", "default": False},
+            {"key": "reports", "name": "崩溃报告", "description": "该磁盘未发现崩溃报告目录", "paths": [], "kind": "tree", "default": False},
+            {"key": "updates", "name": "系统更新缓存", "description": "该磁盘未发现系统更新缓存", "paths": [], "kind": "tree", "default": False},
+            {"key": "recent", "name": "使用痕迹", "description": "该磁盘未发现使用痕迹目录", "paths": [], "kind": "tree", "default": False},
+            {"key": "recycle", "name": "回收站", "description": "清空该磁盘回收站中的项目", "paths": [root / "$RECYCLE.BIN"], "kind": "tree", "default": False},
+        ]
+
     def __init__(self, parent=None):
         super().__init__(parent)
         self.worker = None
@@ -559,7 +603,36 @@ class ProDiskCleanupPanel(QWidget):
             {"key": "reports", "name": "崩溃报告", "description": "Windows 错误报告和应用崩溃转储", "paths": [local / "CrashDumps", local / "Microsoft" / "Windows" / "WER" / "ReportQueue"], "kind": "tree", "default": False, "min_age_seconds": 3600},
             {"key": "updates", "name": "系统更新缓存", "description": "已完成更新留下的下载文件", "paths": [windows / "SoftwareDistribution" / "Download"], "kind": "tree", "default": False, "min_age_seconds": 3600},
             {"key": "recent", "name": "使用痕迹", "description": "最近打开文件记录，不会删除原文件", "paths": [roaming / "Microsoft" / "Windows" / "Recent"], "kind": "tree", "default": False},
+            {"key": "recycle", "name": "回收站", "description": "清空系统盘回收站中的项目", "paths": [Path(os.environ.get("SystemDrive", "C:\\")) / "$RECYCLE.BIN"], "kind": "tree", "default": False},
         ]
+
+        self._system_targets = self.targets
+        self._system_drive = Path(os.environ.get("SystemDrive", "C:\\"))
+        self._drive_entries = self._available_drives()
+        self._selected_drive = self._drive_entries[0][0]
+        for root, _label in self._drive_entries:
+            if str(root).lower().startswith(str(self._system_drive).lower()):
+                self._selected_drive = root
+                break
+        self.targets = self._targets_for_drive(self._selected_drive)
+
+        self.setStyleSheet(
+            """
+            QFrame#cleanupDrive, QFrame#cleanupCard {
+                background: #ffffff;
+                border: 1px solid #dfe5ec;
+                border-radius: 8px;
+            }
+            QFrame#cleanupDrive { padding: 2px; }
+            QFrame#cleanupCard { min-height: 62px; }
+            QFrame#cleanupCard:hover { border-color: #26a269; }
+            QComboBox { min-height: 32px; padding: 0 10px; border: 1px solid #cfd8e3; border-radius: 6px; background: #ffffff; }
+            QCheckBox { spacing: 8px; font-weight: 600; }
+            QLabel#cleanupSize { color: #168653; font-weight: 700; }
+            QPushButton#primaryAction { background: #20b875; color: #ffffff; border: 0; border-radius: 8px; font-weight: 700; }
+            QPushButton#primaryAction:hover { background: #179962; }
+            """
+        )
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(24, 20, 24, 20)
@@ -575,7 +648,12 @@ class ProDiskCleanupPanel(QWidget):
         drive.setObjectName("cleanupDrive")
         drive_layout = QVBoxLayout(drive)
         drive_top = QHBoxLayout()
-        drive_top.addWidget(QLabel("系统盘"))
+        drive_top.addWidget(QLabel("扫描磁盘"))
+        self.drive_combo = QComboBox()
+        for root, label in self._drive_entries:
+            self.drive_combo.addItem(label, str(root))
+        self.drive_combo.currentIndexChanged.connect(self._on_drive_changed)
+        drive_top.addWidget(self.drive_combo)
         self.drive_free = QLabel("正在读取磁盘空间...")
         self.drive_free.setObjectName("contentStatus")
         drive_top.addStretch(1)
@@ -586,6 +664,14 @@ class ProDiskCleanupPanel(QWidget):
         self.drive_progress.setFixedHeight(8)
         drive_layout.addWidget(self.drive_progress)
         layout.addWidget(drive)
+
+        list_header = QHBoxLayout()
+        list_header.addWidget(QLabel("可清理项目"))
+        self.select_all = QCheckBox("全选")
+        self.select_all.toggled.connect(self._toggle_all)
+        list_header.addStretch(1)
+        list_header.addWidget(self.select_all)
+        layout.addLayout(list_header)
 
         cards = QWidget()
         grid = QGridLayout(cards)
@@ -611,9 +697,13 @@ class ProDiskCleanupPanel(QWidget):
             detail.setWordWrap(True)
             detail.setObjectName("contentStatus")
             card_layout.addWidget(detail)
-            grid.addWidget(frame, index // 2, index % 2)
+            grid.addWidget(frame, index, 0)
             self.cards[target["key"]] = (check, size, detail)
-        layout.addWidget(cards, 1)
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setFrameShape(QFrame.NoFrame)
+        scroll.setWidget(cards)
+        layout.addWidget(scroll, 1)
 
         self.progress = QProgressBar()
         self.progress.setRange(0, 100)
@@ -645,9 +735,35 @@ class ProDiskCleanupPanel(QWidget):
             return f"{size / 1024:.1f} KB"
         return f"{size} B"
 
+    def _update_card_metadata(self):
+        for target in self.targets:
+            card = self.cards.get(target["key"])
+            if not card:
+                continue
+            check, size, detail = card
+            check.setText(target["name"])
+            check.setChecked(target.get("default", False))
+            size.setText("未扫描")
+            detail.setText(target["description"])
+
+    def _on_drive_changed(self, index):
+        if index < 0:
+            return
+        if self.worker and self.worker.isRunning():
+            return
+        self._selected_drive = Path(self.drive_combo.itemData(index))
+        self.targets = self._targets_for_drive(self._selected_drive)
+        self._update_card_metadata()
+        self._refresh_drive()
+        self.scan()
+
+    def _toggle_all(self, checked):
+        for check, _size, _detail in self.cards.values():
+            check.setChecked(checked)
+
     def _refresh_drive(self):
         try:
-            usage = shutil.disk_usage(Path(os.environ.get("SystemDrive", "C:")))
+            usage = shutil.disk_usage(self._selected_drive)
             percent = int((usage.total - usage.free) * 100 / max(1, usage.total))
             self.drive_progress.setValue(percent)
             self.drive_free.setText(f"可用 {self._format_size(usage.free)} / 共 {self._format_size(usage.total)}")
@@ -657,6 +773,7 @@ class ProDiskCleanupPanel(QWidget):
     def _set_busy(self, busy, message):
         self.scan_button.setEnabled(not busy)
         self.clean_button.setEnabled(not busy and bool(self.rows))
+        self.drive_combo.setEnabled(not busy)
         self.status.setText(message)
 
     def scan(self):
@@ -719,12 +836,10 @@ def _load_panels(window):
     window._updater = updater.Updater(window)
     about = AboutPanel(window._updater, window)
     window.about_panel = about
-    window.tab_widget.addTab(about, "关于")
     window._updater.check()
 
     launcher = load_raw("launcher")
     reaction_test = load_raw("reaction_test")
-    library_manager = load_raw("library_manager")
     mythware_panel = load_raw("mythware_panel")
     ai_panel = load_raw("ai_panel")
 
@@ -734,11 +849,6 @@ def _load_panels(window):
 
     reaction = reaction_test.ReactionTestPanel(window)
     window.tab_widget.insertTab(2, reaction, "反应力测试")
-
-    package_root = resource_path("").resolve()
-    libraries = library_manager.LibraryManager(package_root, window)
-    window.library_manager = libraries
-    window.tab_widget.addTab(libraries, "常用库管理")
 
     assistant = mythware_panel.MythwarePanel(window)
     window.assistant_panel = assistant
@@ -752,6 +862,7 @@ def _load_panels(window):
     cleanup = ProDiskCleanupPanel(window)
     window.cleanup_panel = cleanup
     window.tab_widget.addTab(cleanup, "磁盘清理")
+    window.tab_widget.addTab(about, "关于")
 
 def main():
     app = QApplication(sys.argv)
