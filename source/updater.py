@@ -21,7 +21,7 @@ from PyQt5.QtWidgets import QMessageBox, QApplication, QProgressDialog
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 
-CURRENT_VERSION = "1.2.3"
+CURRENT_VERSION = "1.2.4"
 # Upload a toolbox EXE asset to this repository to publish updates.
 DEFAULT_RELEASE_API = "https://gitee.com/api/v5/repos/xiaoqi313/qiyuan-tool/releases/latest"
 FALLBACK_RELEASE_API = "https://api.github.com/repos/abab120/qiyuan-tool/releases/latest"
