@@ -8,7 +8,7 @@ a = Analysis(
     ['main.py'],
     pathex=[],
     binaries=[],
-    datas=[(str(RUNTIME / name), '.') for name in ('tool.raw', 'launcher.raw', 'ai_panel.raw', 'library_manager.raw', 'mythware_panel.raw', 'reaction_test.raw', 'favicon.ico')],
+    datas=[(str(RUNTIME / name), '.') for name in ('tool.raw', 'launcher.raw', 'ai_panel.raw', 'mythware_panel.raw', 'reaction_test.raw', 'favicon.ico')],
     hiddenimports=['pyautogui', 'pyzipper', 'psutil', 'PIL', 'cryptography', 'rarfile', 'requests'],
     hookspath=[],
     hooksconfig={},
