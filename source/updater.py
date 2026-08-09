@@ -1,6 +1,7 @@
 import hashlib
 import json
 import os
+import re
 import subprocess
 import sys
 import tempfile
@@ -22,7 +23,8 @@ urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 CURRENT_VERSION = "1.0.0"
 # Upload a toolbox EXE asset to this repository to publish updates.
-DEFAULT_RELEASE_API = "https://api.github.com/repos/abab120/qiyuan-tool/releases/latest"
+DEFAULT_RELEASE_API = "https://gitee.com/api/v5/repos/xiaoqi313/qiyuan-tool/releases/latest"
+FALLBACK_RELEASE_API = "https://api.github.com/repos/abab120/qiyuan-tool/releases/latest"
 
 
 def _base_dir():
@@ -124,6 +126,10 @@ def _read_release(data):
     digest = asset.get("digest", "")
     if digest.startswith("sha256:"):
         digest = digest[7:]
+    if not digest:
+        match = re.search(r"sha256\s*[:=]\s*([0-9a-f]{64})", str(data.get("body", "")), re.IGNORECASE)
+        if match:
+            digest = match.group(1)
     download_url = asset.get("browser_download_url")
     return {
         "version": version,
@@ -224,18 +230,45 @@ class CheckWorker(QThread):
     checked = pyqtSignal(object)
     error = pyqtSignal(str)
 
+    @staticmethod
+    def _fetch_payload(endpoint):
+        """Fetch one release endpoint, falling back to Windows' native TLS client."""
+        try:
+            response = requests.get(
+                endpoint,
+                timeout=(3, 5),
+                headers={"Accept": "application/json", "User-Agent": "QiyuanToolbox"},
+            )
+            response.raise_for_status()
+            return response.json()
+        except requests.exceptions.RequestException:
+            return json.loads(_native_request(endpoint))
+
     def run(self):
         try:
+            endpoints = [_manifest_url()]
+            if FALLBACK_RELEASE_API not in endpoints:
+                endpoints.append(FALLBACK_RELEASE_API)
+            payload = None
+            last_error = None
+            executor = ThreadPoolExecutor(max_workers=len(endpoints))
+            futures = [executor.submit(self._fetch_payload, endpoint) for endpoint in endpoints]
             try:
-                response = requests.get(
-                    _manifest_url(),
-                    timeout=8,
-                    headers={"Accept": "application/json", "User-Agent": "QiyuanToolbox"},
-                )
-                response.raise_for_status()
-                payload = response.json()
-            except requests.exceptions.RequestException:
-                payload = json.loads(_native_request(_manifest_url()))
+                # Race the configured channel and the fallback so a slow
+                # provider never blocks a healthy one.
+                for future in as_completed(futures):
+                    try:
+                        payload = future.result()
+                        if payload:
+                            break
+                    except Exception as exc:
+                        last_error = exc
+            finally:
+                for future in futures:
+                    future.cancel()
+                executor.shutdown(wait=False, cancel_futures=True)
+            if payload is None:
+                raise last_error or RuntimeError("无法获取更新信息")
             manifest = _read_release(payload)
             self.checked.emit(manifest)
             if manifest and _version(manifest.get("version")) > _version(CURRENT_VERSION):
@@ -346,7 +379,7 @@ class Updater:
         self.progress_dialog = None
 
     def schedule(self):
-        QTimer.singleShot(1800, self.check)
+        QTimer.singleShot(300, self.check)
 
     def check(self):
         self.checker = CheckWorker(self.parent)
