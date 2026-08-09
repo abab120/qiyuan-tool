@@ -159,7 +159,9 @@ class DownloadWorker(QThread):
         self.manifest = manifest
 
     def run(self):
-        temp_path = Path(tempfile.gettempdir()) / "qj_toolbox_update.exe"
+        fd, temp_name = tempfile.mkstemp(prefix="qj_toolbox_update_", suffix=".exe")
+        os.close(fd)
+        temp_path = Path(temp_name)
         try:
             try:
                 response = requests.get(
