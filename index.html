@@ -135,21 +135,57 @@
       transform: translateY(-2px);
     }
 
-    .browser-tip {
+    .browser-dialog {
       display: none;
-      position: sticky;
-      top: 0;
-      z-index: 200;
-      padding: 12px 20px;
-      background: #fff7df;
-      border-bottom: 1px solid #efd58a;
-      color: #6b4d00;
+      position: fixed;
+      inset: 0;
+      z-index: 400;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+      background: rgba(22, 31, 45, 0.46);
+    }
+
+    .browser-dialog.active {
+      display: flex;
+    }
+
+    .browser-dialog-panel {
+      width: min(440px, 100%);
+      padding: 28px;
+      background: #ffffff;
+      border: 1px solid #e1e7ef;
+      border-radius: 14px;
+      box-shadow: 0 18px 50px rgba(20, 35, 50, 0.22);
       text-align: center;
+    }
+
+    .browser-dialog-panel h3 {
+      margin-bottom: 10px;
+      color: #253244;
+    }
+
+    .browser-dialog-panel p {
+      margin: 0;
+      color: #687385;
+      line-height: 1.7;
       font-size: 14px;
     }
 
-    .browser-tip.active {
-      display: block;
+    .browser-dialog-close {
+      width: 100%;
+      margin-top: 22px;
+      padding: 11px 14px;
+      border: 0;
+      border-radius: 8px;
+      color: #ffffff;
+      background: #20a86b;
+      cursor: pointer;
+      font-size: 14px;
+    }
+
+    .browser-dialog-close:hover {
+      background: #18895a;
     }
 
     .download-chooser {
@@ -392,8 +428,12 @@
 
 <body>
 
-<div class="browser-tip" id="browser-tip">
-  检测到当前页面可能在微信或 QQ 浏览器中打开。请点击右上角菜单，选择“在浏览器中打开”，再下载或查看开源页面。
+<div class="browser-dialog" id="browser-dialog" aria-hidden="true">
+  <div class="browser-dialog-panel" role="dialog" aria-modal="true" aria-labelledby="browser-dialog-title">
+    <h3 id="browser-dialog-title">请使用第三方浏览器下载</h3>
+    <p>微信或 QQ 内置浏览器不支持直接下载。请点击右上角菜单，选择“在浏览器中打开”，再重新选择下载渠道。</p>
+    <button class="browser-dialog-close" type="button" id="browser-dialog-close">知道了</button>
+  </div>
 </div>
 
 
@@ -809,15 +849,24 @@
   (() => {
     const ua = navigator.userAgent || "";
     const embedded = /MicroMessenger|MQQBrowser|QQBrowser|QQ\//i.test(ua);
-    const tip = document.getElementById("browser-tip");
-    if (!embedded || !tip) return;
-    tip.classList.add("active");
+    const dialog = document.getElementById("browser-dialog");
+    const closeButton = document.getElementById("browser-dialog-close");
+    if (!embedded || !dialog || !closeButton) return;
+    const showDialog = (event) => {
+      event.preventDefault();
+      dialog.classList.add("active");
+      dialog.setAttribute("aria-hidden", "false");
+    };
+    const hideDialog = () => {
+      dialog.classList.remove("active");
+      dialog.setAttribute("aria-hidden", "true");
+    };
     document.querySelectorAll('a[target="_blank"]').forEach((link) => {
-      link.addEventListener("click", (event) => {
-        event.preventDefault();
-        tip.classList.add("active");
-        tip.scrollIntoView({ behavior: "smooth", block: "center" });
-      });
+      link.addEventListener("click", showDialog);
+    });
+    closeButton.addEventListener("click", hideDialog);
+    dialog.addEventListener("click", (event) => {
+      if (event.target === dialog) hideDialog();
     });
   })();
 </script>
