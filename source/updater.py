@@ -21,7 +21,7 @@ from PyQt5.QtWidgets import QMessageBox, QApplication, QProgressDialog
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 
-CURRENT_VERSION = "1.0.0"
+CURRENT_VERSION = "1.1.0"
 # Upload a toolbox EXE asset to this repository to publish updates.
 DEFAULT_RELEASE_API = "https://gitee.com/api/v5/repos/xiaoqi313/qiyuan-tool/releases/latest"
 FALLBACK_RELEASE_API = "https://api.github.com/repos/abab120/qiyuan-tool/releases/latest"
@@ -444,17 +444,27 @@ class Updater:
             QMessageBox.information(self.parent, "更新提示", "开发模式不会替换 Python 解释器，请在打包后的 EXE 中更新。")
             return
         current = Path(sys.executable).resolve()
+        old_copy = current.with_name(current.name + ".old")
         script = Path(tempfile.gettempdir()) / f"qj_apply_update_{os.getpid()}.cmd"
         script.write_text(
             "@echo off\r\n"
             "setlocal\r\n"
-            "timeout /t 2 /nobreak >nul\r\n"
+            "timeout /t 1 /nobreak >nul\r\n"
             ":retry\r\n"
-            f'copy /y "{downloaded}" "{current}" >nul\r\n'
+            f'del /q "{old_copy}" >nul 2>nul\r\n'
+            f'move /y "{current}" "{old_copy}" >nul 2>nul\r\n'
             "if errorlevel 1 (\r\n"
             "  timeout /t 1 /nobreak >nul\r\n"
             "  goto retry\r\n"
             ")\r\n"
+            f'copy /y "{downloaded}" "{current}" >nul 2>nul\r\n'
+            "if errorlevel 1 (\r\n"
+            f'  move /y "{old_copy}" "{current}" >nul 2>nul\r\n'
+            "  timeout /t 1 /nobreak >nul\r\n"
+            "  goto retry\r\n"
+            ")\r\n"
+            f'start "" "{current}"\r\n'
+            f'del /q "{old_copy}" >nul 2>nul\r\n'
             f'del /q "{downloaded}" >nul 2>nul\r\n'
             f'del "%~f0"\r\n',
             encoding="mbcs",
@@ -462,7 +472,7 @@ class Updater:
         QMessageBox.information(
             self.parent,
             "更新完成",
-            "更新文件已准备完成。点击“确定”退出程序，然后重新打开工具箱。",
+            "新版本将自动安装，程序将自动重启，并清理旧版本和临时文件。",
         )
         subprocess.Popen(["cmd.exe", "/c", str(script)], creationflags=0x08000000)
         QApplication.instance().quit()
