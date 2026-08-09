@@ -3,6 +3,7 @@ import os
 import shutil
 import sys
 import tempfile
+import time
 import types
 from pathlib import Path
 
@@ -32,6 +33,9 @@ from PyQt5.QtCore import QThread, QTimer, Qt, pyqtSignal
 from PyQt5.QtWidgets import (
     QApplication,
     QAbstractItemView,
+    QCheckBox,
+    QFrame,
+    QGridLayout,
     QHBoxLayout,
     QLabel,
     QMessageBox,
@@ -175,7 +179,7 @@ def _install_process_manager():
 _install_process_manager()
 
 
-CURRENT_VERSION = "1.0.0"
+CURRENT_VERSION = "1.1.0"
 OPEN_SOURCE_URL = "https://github.com/abab120/qiyuan-tool"
 
 
@@ -430,6 +434,286 @@ class DiskCleanupPanel(QWidget):
         self.worker = None
 
 
+class ProDiskCleanupWorker(QThread):
+    progress = pyqtSignal(int, str)
+    scanned = pyqtSignal(object)
+    completed = pyqtSignal(int, int)
+    failed = pyqtSignal(str)
+
+    def __init__(self, targets, cleanup=False, parent=None):
+        super().__init__(parent)
+        self.targets = targets
+        self.cleanup = cleanup
+
+    def _files(self, target):
+        current_mei = Path(getattr(sys, "_MEIPASS", "")).resolve()
+        cutoff = time.time() - int(target.get("min_age_seconds", 0))
+        seen = set()
+        for root in target.get("paths", []):
+            root = Path(root)
+            if not root.exists():
+                continue
+            candidates = root.glob(target.get("pattern", "*")) if target.get("kind") == "glob" else root.rglob("*")
+            for path in candidates:
+                if not path.is_file():
+                    continue
+                try:
+                    resolved = path.resolve()
+                    if resolved in seen or (current_mei != Path(".").resolve() and current_mei in resolved.parents):
+                        continue
+                    if path.stat().st_mtime > cutoff:
+                        continue
+                except OSError:
+                    continue
+                seen.add(resolved)
+                yield path
+
+    def run(self):
+        try:
+            results = []
+            removed_bytes = 0
+            removed_files = 0
+            count = max(1, len(self.targets))
+            for index, target in enumerate(self.targets, 1):
+                self.progress.emit(int((index - 1) * 100 / count), f"正在扫描 {target['name']}...")
+                files = list(self._files(target))
+                size = 0
+                for path in files:
+                    try:
+                        size += path.stat().st_size
+                    except OSError:
+                        pass
+                results.append({"key": target["key"], "size": size, "files": len(files)})
+                if self.cleanup:
+                    for path in files:
+                        try:
+                            amount = path.stat().st_size
+                            path.unlink()
+                            removed_bytes += amount
+                            removed_files += 1
+                        except (OSError, PermissionError):
+                            continue
+                    for root in target.get("paths", []):
+                        root = Path(root)
+                        if target.get("kind") == "tree" and root.exists():
+                            for directory in sorted(root.rglob("*"), reverse=True):
+                                if directory.is_dir():
+                                    try:
+                                        directory.rmdir()
+                                    except OSError:
+                                        pass
+            if self.cleanup:
+                self.completed.emit(removed_bytes, removed_files)
+            else:
+                self.progress.emit(100, "扫描完成")
+                self.scanned.emit(results)
+        except Exception as exc:
+            self.failed.emit(str(exc))
+
+
+class ProDiskCleanupPanel(QWidget):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.worker = None
+        self.rows = {}
+        local = Path(os.environ.get("LOCALAPPDATA", tempfile.gettempdir()))
+        roaming = Path(os.environ.get("APPDATA", local / "Roaming"))
+        windows = Path(os.environ.get("WINDIR", "C:\\Windows"))
+
+        def browser_roots(base):
+            roots = []
+            if base.exists():
+                for profile in base.iterdir():
+                    if not profile.is_dir():
+                        continue
+                    for name in ("Cache", "Code Cache", "GPUCache", "ShaderCache"):
+                        path = profile / name
+                        if path.exists():
+                            roots.append(path)
+                    cache_data = profile / "Cache" / "Cache_Data"
+                    if cache_data.exists():
+                        roots.append(cache_data)
+            return roots
+
+        browser = browser_roots(local / "Google" / "Chrome" / "User Data")
+        browser += browser_roots(local / "Microsoft" / "Edge" / "User Data")
+        browser += browser_roots(local / "Mozilla" / "Firefox" / "Profiles")
+
+        def app_cache_roots(bases):
+            roots = []
+            for base in bases:
+                if not base.exists():
+                    continue
+                for pattern in ("*/FileStorage/Cache", "*/Cache", "*/Temp"):
+                    roots.extend(path for path in base.glob(pattern) if path.is_dir())
+            return roots
+
+        wechat = app_cache_roots([local / "Tencent" / "WeChat", roaming / "Tencent" / "WeChat", local / "Tencent" / "WeChat Files"])
+        qq = app_cache_roots([local / "Tencent" / "QQ", roaming / "Tencent" / "QQ"])
+        self.targets = [
+            {"key": "system", "name": "系统临时文件", "description": "安装、更新和程序运行产生的临时文件", "paths": [Path(tempfile.gettempdir()), windows / "Temp"], "kind": "tree", "default": True, "min_age_seconds": 900},
+            {"key": "browser", "name": "浏览器缓存", "description": "Chrome、Edge、Firefox 的缓存和代码缓存", "paths": browser, "kind": "tree", "default": True},
+            {"key": "wechat", "name": "微信缓存", "description": "微信图片预览、缓存和临时文件，不包含聊天记录", "paths": wechat, "kind": "tree", "default": False},
+            {"key": "qq", "name": "QQ 缓存", "description": "QQ 图片预览和临时缓存，不包含聊天记录", "paths": qq, "kind": "tree", "default": False},
+            {"key": "thumbs", "name": "缩略图缓存", "description": "Windows 图片和视频缩略图数据库", "paths": [local / "Microsoft" / "Windows" / "Explorer"], "kind": "glob", "pattern": "thumbcache*.db", "default": True},
+            {"key": "reports", "name": "崩溃报告", "description": "Windows 错误报告和应用崩溃转储", "paths": [local / "CrashDumps", local / "Microsoft" / "Windows" / "WER" / "ReportQueue"], "kind": "tree", "default": False, "min_age_seconds": 3600},
+            {"key": "updates", "name": "系统更新缓存", "description": "已完成更新留下的下载文件", "paths": [windows / "SoftwareDistribution" / "Download"], "kind": "tree", "default": False, "min_age_seconds": 3600},
+            {"key": "recent", "name": "使用痕迹", "description": "最近打开文件记录，不会删除原文件", "paths": [roaming / "Microsoft" / "Windows" / "Recent"], "kind": "tree", "default": False},
+        ]
+
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(24, 20, 24, 20)
+        layout.setSpacing(12)
+        title = QLabel("空间告急")
+        title.setObjectName("contentTitle")
+        layout.addWidget(title)
+        subtitle = QLabel("扫描清理，释放磁盘空间")
+        subtitle.setObjectName("contentStatus")
+        layout.addWidget(subtitle)
+
+        drive = QFrame()
+        drive.setObjectName("cleanupDrive")
+        drive_layout = QVBoxLayout(drive)
+        drive_top = QHBoxLayout()
+        drive_top.addWidget(QLabel("系统盘"))
+        self.drive_free = QLabel("正在读取磁盘空间...")
+        self.drive_free.setObjectName("contentStatus")
+        drive_top.addStretch(1)
+        drive_top.addWidget(self.drive_free)
+        drive_layout.addLayout(drive_top)
+        self.drive_progress = QProgressBar()
+        self.drive_progress.setTextVisible(False)
+        self.drive_progress.setFixedHeight(8)
+        drive_layout.addWidget(self.drive_progress)
+        layout.addWidget(drive)
+
+        cards = QWidget()
+        grid = QGridLayout(cards)
+        grid.setContentsMargins(0, 0, 0, 0)
+        grid.setHorizontalSpacing(10)
+        grid.setVerticalSpacing(10)
+        self.cards = {}
+        for index, target in enumerate(self.targets):
+            frame = QFrame()
+            frame.setObjectName("cleanupCard")
+            card_layout = QVBoxLayout(frame)
+            card_layout.setContentsMargins(14, 12, 14, 12)
+            top = QHBoxLayout()
+            check = QCheckBox(target["name"])
+            check.setChecked(target.get("default", False))
+            top.addWidget(check)
+            top.addStretch(1)
+            size = QLabel("未扫描")
+            size.setObjectName("cleanupSize")
+            top.addWidget(size)
+            card_layout.addLayout(top)
+            detail = QLabel(target["description"])
+            detail.setWordWrap(True)
+            detail.setObjectName("contentStatus")
+            card_layout.addWidget(detail)
+            grid.addWidget(frame, index // 2, index % 2)
+            self.cards[target["key"]] = (check, size, detail)
+        layout.addWidget(cards, 1)
+
+        self.progress = QProgressBar()
+        self.progress.setRange(0, 100)
+        layout.addWidget(self.progress)
+        self.status = QLabel("准备扫描")
+        layout.addWidget(self.status)
+        buttons = QHBoxLayout()
+        self.scan_button = QPushButton("扫描")
+        self.scan_button.setObjectName("primaryAction")
+        self.scan_button.setMinimumHeight(50)
+        self.scan_button.clicked.connect(self.scan)
+        self.clean_button = QPushButton("一键清理选中")
+        self.clean_button.setMinimumHeight(42)
+        self.clean_button.clicked.connect(self.clean)
+        self.clean_button.setEnabled(False)
+        buttons.addWidget(self.scan_button, 1)
+        buttons.addWidget(self.clean_button, 1)
+        layout.addLayout(buttons)
+        self._refresh_drive()
+        QTimer.singleShot(200, self.scan)
+
+    @staticmethod
+    def _format_size(size):
+        if size >= 1024 ** 3:
+            return f"{size / 1024 ** 3:.2f} GB"
+        if size >= 1024 ** 2:
+            return f"{size / 1024 ** 2:.1f} MB"
+        if size >= 1024:
+            return f"{size / 1024:.1f} KB"
+        return f"{size} B"
+
+    def _refresh_drive(self):
+        try:
+            usage = shutil.disk_usage(Path(os.environ.get("SystemDrive", "C:")))
+            percent = int((usage.total - usage.free) * 100 / max(1, usage.total))
+            self.drive_progress.setValue(percent)
+            self.drive_free.setText(f"可用 {self._format_size(usage.free)} / 共 {self._format_size(usage.total)}")
+        except OSError:
+            self.drive_free.setText("无法读取磁盘空间")
+
+    def _set_busy(self, busy, message):
+        self.scan_button.setEnabled(not busy)
+        self.clean_button.setEnabled(not busy and bool(self.rows))
+        self.status.setText(message)
+
+    def scan(self):
+        if self.worker and self.worker.isRunning():
+            return
+        self.rows = {}
+        for check, size, detail in self.cards.values():
+            size.setText("扫描中...")
+        self._set_busy(True, "正在扫描可清理项目...")
+        self.worker = ProDiskCleanupWorker(self.targets, parent=self)
+        self.worker.progress.connect(lambda value, message: (self.progress.setValue(value), self.status.setText(message)))
+        self.worker.scanned.connect(self._on_scanned)
+        self.worker.failed.connect(self._on_failed)
+        self.worker.finished.connect(self._release_worker)
+        self.worker.start()
+
+    def _on_scanned(self, results):
+        self.rows = {result["key"]: result for result in results}
+        total = 0
+        for target in self.targets:
+            result = self.rows.get(target["key"], {"size": 0, "files": 0})
+            total += result["size"]
+            check, size, detail = self.cards[target["key"]]
+            size.setText(self._format_size(result["size"]))
+            detail.setText(f"{target['description']} · {result['files']} 个文件")
+        self.progress.setValue(100)
+        self._set_busy(False, f"扫描完成，可清理 {self._format_size(total)}")
+
+    def clean(self):
+        selected = [target for target in self.targets if target["key"] in self.rows and self.cards[target["key"]][0].isChecked()]
+        total = sum(self.rows[target["key"]]["size"] for target in selected)
+        if not selected or total <= 0:
+            QMessageBox.information(self, "磁盘清理", "没有可清理的已选项目。")
+            return
+        answer = QMessageBox.question(self, "确认清理", f"确定清理已选项目中的 {self._format_size(total)} 吗？\n正在使用的文件会自动跳过。", QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
+        if answer != QMessageBox.Yes:
+            return
+        self._set_busy(True, "正在清理文件...")
+        self.worker = ProDiskCleanupWorker(selected, cleanup=True, parent=self)
+        self.worker.progress.connect(lambda value, message: (self.progress.setValue(value), self.status.setText(message)))
+        self.worker.completed.connect(self._on_cleaned)
+        self.worker.failed.connect(self._on_failed)
+        self.worker.finished.connect(self._release_worker)
+        self.worker.start()
+
+    def _on_cleaned(self, amount, files):
+        self._refresh_drive()
+        self._set_busy(False, f"已清理 {files} 个文件，释放 {self._format_size(amount)}")
+        QTimer.singleShot(300, self.scan)
+
+    def _on_failed(self, error):
+        self._set_busy(False, f"扫描失败：{error}")
+
+    def _release_worker(self):
+        self.worker = None
+
+
 def _load_panels(window):
     # Start the update request before loading the heavier feature panels.
     window._updater = updater.Updater(window)
@@ -465,7 +749,7 @@ def _load_panels(window):
     window.tab_widget.insertTab(0, ai, "AI 助手")
     window.tab_widget.setCurrentWidget(ai)
 
-    cleanup = DiskCleanupPanel(window)
+    cleanup = ProDiskCleanupPanel(window)
     window.cleanup_panel = cleanup
     window.tab_widget.addTab(cleanup, "磁盘清理")
 
