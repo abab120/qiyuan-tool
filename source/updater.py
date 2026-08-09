@@ -12,7 +12,7 @@ from PyQt5.QtCore import QThread, QTimer, pyqtSignal
 from PyQt5.QtWidgets import QMessageBox, QApplication
 
 
-CURRENT_VERSION = "1.3.5"
+CURRENT_VERSION = "1.0.0"
 # Upload a toolbox EXE asset to this repository to publish updates.
 DEFAULT_RELEASE_API = "https://api.github.com/repos/abab120/qiyuan-tool/releases/latest"
 
