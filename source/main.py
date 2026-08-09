@@ -1,4 +1,5 @@
 import marshal
+import os
 import sys
 import types
 from pathlib import Path
@@ -31,7 +32,19 @@ import rarfile  # noqa: F401
 import requests  # noqa: F401
 import updater
 from PyQt5.QtGui import QIcon
-from PyQt5.QtWidgets import QApplication
+from PyQt5.QtCore import Qt
+from PyQt5.QtWidgets import (
+    QApplication,
+    QAbstractItemView,
+    QHBoxLayout,
+    QLabel,
+    QMessageBox,
+    QPushButton,
+    QTableWidget,
+    QTableWidgetItem,
+    QTextEdit,
+    QVBoxLayout,
+)
 
 tool = load_raw("tool")
 ai_panel = load_raw("ai_panel")
@@ -39,6 +52,132 @@ library_manager = load_raw("library_manager")
 mythware_panel = load_raw("mythware_panel")
 reaction_test = load_raw("reaction_test")
 launcher = load_raw("launcher")
+
+
+def _refresh_process_table(self):
+    table = self.process_table
+    rows = []
+    for proc in psutil.process_iter(["pid", "name", "memory_info"]):
+        try:
+            info = proc.info
+            memory = int(getattr(info.get("memory_info"), "rss", 0) or 0)
+            rows.append((memory, int(info["pid"]), info.get("name") or "未知进程"))
+        except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess, TypeError, ValueError):
+            continue
+    rows.sort(reverse=True)
+    table.setRowCount(0)
+    for memory, pid, name in rows:
+        row = table.rowCount()
+        table.insertRow(row)
+        checked = QTableWidgetItem()
+        checked.setFlags(Qt.ItemIsEnabled | Qt.ItemIsUserCheckable)
+        checked.setCheckState(Qt.Unchecked)
+        table.setItem(row, 0, checked)
+        table.setItem(row, 1, QTableWidgetItem(name))
+        table.setItem(row, 2, QTableWidgetItem(str(pid)))
+        table.setItem(row, 3, QTableWidgetItem(f"{memory / 1024 / 1024:.0f} MB"))
+    self.process_status.setText(f"共 {len(rows)} 个进程，已按内存占用排序")
+
+
+def _end_selected_processes(self):
+    table = self.process_table
+    selected = []
+    for row in range(table.rowCount()):
+        checkbox = table.item(row, 0)
+        if checkbox and checkbox.checkState() == Qt.Checked:
+            pid_item = table.item(row, 2)
+            name_item = table.item(row, 1)
+            if pid_item and name_item:
+                try:
+                    selected.append((int(pid_item.text()), name_item.text()))
+                except ValueError:
+                    pass
+    selected = [(pid, name) for pid, name in selected if pid != os.getpid()]
+    if not selected:
+        QMessageBox.information(self, "结束进程", "请先勾选要结束的进程。")
+        return
+    names = "、".join(name for _, name in selected[:6])
+    if len(selected) > 6:
+        names += " 等"
+    answer = QMessageBox.question(
+        self,
+        "确认结束进程",
+        f"确定结束 {len(selected)} 个进程吗？\n\n{names}",
+        QMessageBox.Yes | QMessageBox.No,
+        QMessageBox.No,
+    )
+    if answer != QMessageBox.Yes:
+        return
+    ended = 0
+    failed = []
+    for pid, name in selected:
+        try:
+            proc = psutil.Process(pid)
+            proc.terminate()
+            try:
+                proc.wait(timeout=1.5)
+            except psutil.TimeoutExpired:
+                proc.kill()
+                proc.wait(timeout=1.5)
+            ended += 1
+        except (psutil.NoSuchProcess, psutil.ZombieProcess):
+            ended += 1
+        except (psutil.AccessDenied, psutil.TimeoutExpired, OSError) as exc:
+            failed.append(f"{name} ({exc})")
+    _refresh_process_table(self)
+    message = f"已结束 {ended} 个进程。"
+    if failed:
+        message += "\n以下进程未能结束：\n" + "\n".join(failed[:8])
+    QMessageBox.information(self, "操作完成", message)
+
+
+def _init_process_tab(self):
+    layout = QVBoxLayout(self.tab_process)
+    title = QLabel("勾选进程后结束，系统进程可能需要管理员权限")
+    title.setObjectName("processHint")
+    layout.addWidget(title)
+
+    self.process_table = QTableWidget(0, 4)
+    self.process_table.setHorizontalHeaderLabels(["选择", "进程名称", "PID", "内存"])
+    self.process_table.setSelectionBehavior(QAbstractItemView.SelectRows)
+    self.process_table.setSelectionMode(QAbstractItemView.SingleSelection)
+    self.process_table.setEditTriggers(QAbstractItemView.NoEditTriggers)
+    self.process_table.verticalHeader().setVisible(False)
+    self.process_table.setAlternatingRowColors(True)
+    self.process_table.setColumnWidth(0, 58)
+    self.process_table.setColumnWidth(2, 90)
+    self.process_table.setColumnWidth(3, 100)
+    self.process_table.horizontalHeader().setStretchLastSection(True)
+    layout.addWidget(self.process_table, 1)
+
+    self.process_status = QLabel("正在读取进程...")
+    layout.addWidget(self.process_status)
+    self.process_log = QTextEdit()
+    self.process_log.setReadOnly(True)
+    self.process_log.setMaximumHeight(96)
+    self.process_log.setPlaceholderText("服务列表将在这里显示")
+    layout.addWidget(self.process_log)
+
+    buttons = QHBoxLayout()
+    end_button = QPushButton("结束选中进程")
+    end_button.clicked.connect(lambda: _end_selected_processes(self))
+    refresh_button = QPushButton("刷新进程")
+    refresh_button.clicked.connect(lambda: _refresh_process_table(self))
+    service_button = QPushButton("列出运行中的服务")
+    service_button.clicked.connect(self.list_services)
+    buttons.addWidget(end_button)
+    buttons.addWidget(refresh_button)
+    buttons.addWidget(service_button)
+    layout.addLayout(buttons)
+    _refresh_process_table(self)
+
+
+def _install_process_manager():
+    tool.ToolBox.init_process_tab = _init_process_tab
+    tool.ToolBox.list_processes = _refresh_process_table
+
+
+_install_process_manager()
 
 
 def main():
