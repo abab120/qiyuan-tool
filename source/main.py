@@ -201,7 +201,7 @@ def _install_process_manager():
 _install_process_manager()
 
 
-CURRENT_VERSION = "1.2.0"
+CURRENT_VERSION = "1.2.1"
 OPEN_SOURCE_URL = "https://github.com/abab120/qiyuan-tool"
 
 
@@ -231,6 +231,10 @@ class AboutPanel(QWidget):
         self.changelog.setReadOnly(True)
         self.changelog.setMaximumHeight(190)
         self.changelog.setPlainText(
+            "v1.2.1\n"
+            "• 增加嘉豪专用爱心文字模块，支持自定义显示文字\n"
+            "• 增加后台进程检测，禁止程序多开\n"
+            "• 优化圆角界面和下载提示\n\n"
             "v1.2.0\n"
             "• 磁盘清理支持选择不同磁盘，并重新整理清理界面\n"
             "• 移除常用库管理模块，关于页面移动到末尾\n"
