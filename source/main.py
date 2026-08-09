@@ -23,16 +23,10 @@ def load_raw(name):
 
 
 # These imports are intentionally explicit so PyInstaller includes runtime-only imports.
-import PIL  # noqa: F401
-import cryptography  # noqa: F401
 import psutil  # noqa: F401
-import pyautogui  # noqa: F401
-import pyzipper  # noqa: F401
-import rarfile  # noqa: F401
-import requests  # noqa: F401
 import updater
 from PyQt5.QtGui import QIcon
-from PyQt5.QtCore import Qt
+from PyQt5.QtCore import QTimer, Qt
 from PyQt5.QtWidgets import (
     QApplication,
     QAbstractItemView,
@@ -50,11 +44,6 @@ from PyQt5.QtCore import QUrl
 from PyQt5.QtGui import QDesktopServices
 
 tool = load_raw("tool")
-ai_panel = load_raw("ai_panel")
-library_manager = load_raw("library_manager")
-mythware_panel = load_raw("mythware_panel")
-reaction_test = load_raw("reaction_test")
-launcher = load_raw("launcher")
 
 
 def _refresh_process_table(self):
@@ -241,22 +230,12 @@ class AboutPanel(QWidget):
         self.status.setText("更新状态：检查失败，请确认网络连接")
 
 
-def main():
-    app = QApplication(sys.argv)
-    app.setApplicationName("柒悁工具箱")
-    app.setStyle("Fusion")
-    icon = resource_path("favicon.ico")
-    if icon.exists():
-        app.setWindowIcon(QIcon(str(icon)))
-
-    window = tool.ToolBox()
-    window.setWindowTitle("柒悁工具箱")
-    window.setStyleSheet(tool.WORKSPACE_STYLE)
-    for label in window.findChildren(QLabel):
-        if label.text().startswith("v1.2"):
-            label.setText(f"v{CURRENT_VERSION} · 64 位")
-    if icon.exists():
-        window.setWindowIcon(QIcon(str(icon)))
+def _load_panels(window):
+    launcher = load_raw("launcher")
+    reaction_test = load_raw("reaction_test")
+    library_manager = load_raw("library_manager")
+    mythware_panel = load_raw("mythware_panel")
+    ai_panel = load_raw("ai_panel")
 
     aim = launcher.AimTrainerPanel(window)
     window.aim_panel = aim
@@ -278,12 +257,33 @@ def main():
     window.ai_panel = ai
     window.tab_widget.insertTab(0, ai, "AI 助手")
     window.tab_widget.setCurrentWidget(ai)
+
     window._updater = updater.Updater(window)
     about = AboutPanel(window._updater, window)
     window.about_panel = about
     window.tab_widget.addTab(about, "关于")
     window._updater.schedule()
+
+
+def main():
+    app = QApplication(sys.argv)
+    app.setApplicationName("柒悁工具箱")
+    app.setStyle("Fusion")
+    icon = resource_path("favicon.ico")
+    if icon.exists():
+        app.setWindowIcon(QIcon(str(icon)))
+
+    window = tool.ToolBox()
+    window.setWindowTitle("柒悁工具箱")
+    window.setStyleSheet(tool.WORKSPACE_STYLE)
+    for label in window.findChildren(QLabel):
+        if label.text().startswith("v1.2"):
+            label.setText(f"v{CURRENT_VERSION} · 64 位")
+    if icon.exists():
+        window.setWindowIcon(QIcon(str(icon)))
+
     window.show()
+    QTimer.singleShot(0, lambda: _load_panels(window))
     return app.exec_()
 
 
