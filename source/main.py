@@ -183,7 +183,7 @@ def _install_process_manager():
 _install_process_manager()
 
 
-CURRENT_VERSION = "1.3.4"
+CURRENT_VERSION = "1.3.5"
 OPEN_SOURCE_URL = "https://github.com/abab120/qiyuan-tool"
 
 
@@ -213,7 +213,7 @@ class AboutPanel(QWidget):
         buttons = QHBoxLayout()
         self.check_button = QPushButton("检查更新")
         self.check_button.clicked.connect(self.check_updates)
-        source_button = QPushButton("打开开源页面")
+        source_button = QPushButton("开源信息")
         source_button.clicked.connect(lambda: QDesktopServices.openUrl(QUrl(OPEN_SOURCE_URL)))
         buttons.addWidget(self.check_button)
         buttons.addWidget(source_button)
