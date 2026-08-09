@@ -11,7 +11,7 @@ from PyQt5.QtCore import QThread, QTimer, pyqtSignal
 from PyQt5.QtWidgets import QMessageBox, QApplication
 
 
-CURRENT_VERSION = "1.3.2"
+CURRENT_VERSION = "1.3.3"
 # Upload a toolbox EXE asset to this repository to publish updates.
 DEFAULT_RELEASE_API = "https://api.github.com/repos/abab120/qiyuan-tool/releases/latest"
 
@@ -70,16 +70,19 @@ def _read_release(data):
 
 class CheckWorker(QThread):
     found = pyqtSignal(object)
+    checked = pyqtSignal(object)
+    error = pyqtSignal(str)
 
     def run(self):
         try:
             response = requests.get(_manifest_url(), timeout=8, headers={"Accept": "application/json"})
             response.raise_for_status()
             manifest = _read_release(response.json())
+            self.checked.emit(manifest)
             if manifest and _version(manifest.get("version")) > _version(CURRENT_VERSION):
                 self.found.emit(manifest)
-        except Exception:
-            return
+        except Exception as exc:
+            self.error.emit(str(exc))
 
 
 class DownloadWorker(QThread):
@@ -135,6 +138,16 @@ class Updater:
         self.checker.found.connect(self._offer)
         self.checker.finished.connect(self._release_checker)
         self.checker.start()
+
+    def check_now(self, checked, failed):
+        if self.checker and self.checker.isRunning():
+            return False
+        self.checker = CheckWorker(self.parent)
+        self.checker.checked.connect(checked)
+        self.checker.error.connect(failed)
+        self.checker.finished.connect(self._release_checker)
+        self.checker.start()
+        return True
 
     def _release_checker(self):
         self.checker = None
