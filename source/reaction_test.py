@@ -20,6 +20,7 @@ from PyQt5.QtWidgets import (
 class ReactionBoard(QWidget):
     clicked = pyqtSignal(float)
     failed = pyqtSignal()
+    retry = pyqtSignal()
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -30,8 +31,9 @@ class ReactionBoard(QWidget):
         self.started_at = 0.0
         self.too_early = False
         self.idle = QColor("#6c757d")
-        self.wait_color = QColor("#2e7d32")
-        self.ready_color = QColor("#dc3545")
+        self.wait_color = QColor("#d9534f")
+        self.ready_color = QColor("#2eaf62")
+        self.early_color = QColor("#f2c94c")
         self.color = self.idle
 
     def start_wait(self):
@@ -63,11 +65,11 @@ class ReactionBoard(QWidget):
         painter.setPen(QPen(Qt.white, 2))
         painter.setFont(QFont("Microsoft YaHei", 16, QFont.Bold))
         if self.too_early:
-            text = "太早了，点击重新开始"
+            text = "请在变绿后再点击"
         elif self.waiting:
-            text = "等待变红..."
+            text = "准备中，等待变绿..."
         elif self.ready:
-            text = "点击！"
+            text = "变绿后点击！"
         else:
             text = "点击开始测试"
         painter.drawText(self.rect(), Qt.AlignCenter, text)
@@ -76,7 +78,12 @@ class ReactionBoard(QWidget):
         if event.button() != Qt.LeftButton:
             return
         if self.too_early:
-            self.reset_board()
+            self.too_early = False
+            self.waiting = True
+            self.ready = False
+            self.color = self.wait_color
+            self.update()
+            self.retry.emit()
         elif self.ready:
             elapsed = (time.perf_counter() - self.started_at) * 1000.0
             self.ready = False
@@ -86,7 +93,7 @@ class ReactionBoard(QWidget):
         elif self.waiting:
             self.waiting = False
             self.too_early = True
-            self.color = QColor("#c62828")
+            self.color = self.early_color
             self.update()
             self.failed.emit()
 
@@ -110,7 +117,7 @@ class ReactionTestPanel(QWidget):
         title = QLabel("反应力测试")
         title.setObjectName("contentTitle")
         layout.addWidget(title)
-        hint = QLabel("屏幕变红后尽快点击，测试你的反应速度。")
+        hint = QLabel("屏幕变绿后尽快点击，测试你的反应速度。误点后再次点击黄色区域即可重置等待时间。")
         hint.setObjectName("hintPanel")
         layout.addWidget(hint)
 
@@ -118,6 +125,7 @@ class ReactionTestPanel(QWidget):
         self.board.setMinimumHeight(220)
         self.board.clicked.connect(self._hit)
         self.board.failed.connect(self._miss)
+        self.board.retry.connect(self._retry)
         layout.addWidget(self.board)
 
         settings = QGroupBox("测试设置")
@@ -186,9 +194,12 @@ class ReactionTestPanel(QWidget):
         self._next_round()
 
     def _miss(self):
-        self.round_index += 1
+        self.wait_timer.stop()
         self._update_metrics()
-        self._next_round()
+
+    def _retry(self):
+        self.wait_timer.stop()
+        self.wait_timer.start(int(random.uniform(1000, 4000)))
 
     def _finish(self):
         self.wait_timer.stop()
