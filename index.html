@@ -135,6 +135,23 @@
       transform: translateY(-2px);
     }
 
+    .browser-tip {
+      display: none;
+      position: sticky;
+      top: 0;
+      z-index: 200;
+      padding: 12px 20px;
+      background: #fff7df;
+      border-bottom: 1px solid #efd58a;
+      color: #6b4d00;
+      text-align: center;
+      font-size: 14px;
+    }
+
+    .browser-tip.active {
+      display: block;
+    }
+
     /* 通用区域 */
     .section {
       max-width: 1100px;
@@ -295,6 +312,10 @@
 
 <body>
 
+<div class="browser-tip" id="browser-tip">
+  检测到当前页面可能在微信或 QQ 浏览器中打开。请点击右上角菜单，选择“在浏览器中打开”，再下载或查看开源页面。
+</div>
+
 
 <!-- 顶部导航 -->
 <header>
@@ -331,7 +352,7 @@
   <div class="badges">
 
     <span class="badge">
-      🚀 v1.0.0
+      🚀 v1.1.0
     </span>
 
     <span class="badge">
@@ -569,7 +590,7 @@
   <h2>🖼️ 软件截图</h2>
 
   <p class="section-title-text">
-    柒悁工具箱 v1.0.0
+    柒悁工具箱 v1.1.0
   </p>
 
   <img
@@ -594,21 +615,23 @@
     </h3>
 
     <p>
-      当前版本：v1.0.0 · Windows 64 位
+      当前版本：v1.1.0 · Windows 64 位
     </p>
 
     <a
       class="btn btn-primary"
-      href="https://github.com/abab120/qiyuan-tool/releases/download/v1.0.0/Toolbox-v1.0.0.exe"
+      href="https://github.com/abab120/qiyuan-tool/releases/download/v1.1.0/Toolbox-v1.1.0.exe"
       target="_blank"
+      rel="noopener"
     >
       ⬇ 下载 EXE
     </a>
 
     <a
       class="btn btn-secondary"
-      href="https://github.com/abab120/qiyuan-tool/releases/download/v1.0.0/Toolbox-v1.0.0.zip"
+      href="https://github.com/abab120/qiyuan-tool/releases/download/v1.1.0/Toolbox-v1.1.0.zip"
       target="_blank"
+      rel="noopener"
     >
       ⬇ 下载 ZIP
     </a>
@@ -627,10 +650,27 @@
   </p>
 
   <p>
-    v1.0.0 · Windows 64 位
+    v1.1.0 · Windows 64 位
   </p>
 
 </footer>
+
+<script>
+  (() => {
+    const ua = navigator.userAgent || "";
+    const embedded = /MicroMessenger|MQQBrowser|QQBrowser|QQ\//i.test(ua);
+    const tip = document.getElementById("browser-tip");
+    if (!embedded || !tip) return;
+    tip.classList.add("active");
+    document.querySelectorAll('a[target="_blank"]').forEach((link) => {
+      link.addEventListener("click", (event) => {
+        event.preventDefault();
+        tip.classList.add("active");
+        tip.scrollIntoView({ behavior: "smooth", block: "center" });
+      });
+    });
+  })();
+</script>
 
 
 </body>
