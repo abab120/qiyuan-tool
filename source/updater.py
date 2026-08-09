@@ -6,6 +6,8 @@ import sys
 import tempfile
 import shutil
 import time
+import threading
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from urllib.parse import urlparse
 from pathlib import Path
 
@@ -138,6 +140,77 @@ def _mirror_urls(url):
     return [f"https://gh-proxy.com/{url}"]
 
 
+def _parallel_download(url, output_path, progress):
+    """Download a ranged asset concurrently; return False when Range is unsupported."""
+    probe = requests.get(
+        url,
+        stream=True,
+        headers={"Range": "bytes=0-0", "User-Agent": "QiyuanToolbox"},
+        timeout=(8, 20),
+    )
+    try:
+        if probe.status_code != 206:
+            return False
+        content_range = probe.headers.get("content-range", "")
+        if "/" not in content_range:
+            return False
+        total = int(content_range.rsplit("/", 1)[1])
+    finally:
+        probe.close()
+    if total < 4 * 1024 * 1024:
+        return False
+
+    workers = 4
+    step = (total + workers - 1) // workers
+    ranges = [(start, min(total - 1, start + step - 1)) for start in range(0, total, step)]
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    with output_path.open("wb") as output:
+        output.truncate(total)
+    completed = 0
+    lock = threading.Lock()
+
+    def fetch_range(start, end):
+        nonlocal completed
+        response = requests.get(
+            url,
+            stream=True,
+            headers={
+                "Range": f"bytes={start}-{end}",
+                "User-Agent": "QiyuanToolbox",
+            },
+            timeout=(8, 30),
+        )
+        try:
+            if response.status_code != 206:
+                raise ValueError("下载线路不支持分段请求")
+            remaining = end - start + 1
+            position = start
+            with output_path.open("r+b") as output:
+                for chunk in response.iter_content(1024 * 256):
+                    if not chunk:
+                        continue
+                    chunk = chunk[:remaining]
+                    output.seek(position)
+                    output.write(chunk)
+                    position += len(chunk)
+                    remaining -= len(chunk)
+                    with lock:
+                        completed += len(chunk)
+                        progress(min(99, completed * 100 // total))
+                    if remaining <= 0:
+                        break
+            if remaining:
+                raise IOError("分段下载未完成")
+        finally:
+            response.close()
+
+    with ThreadPoolExecutor(max_workers=workers) as pool:
+        futures = [pool.submit(fetch_range, start, end) for start, end in ranges]
+        for future in as_completed(futures):
+            future.result()
+    return True
+
+
 class CheckWorker(QThread):
     found = pyqtSignal(object)
     checked = pyqtSignal(object)
@@ -185,6 +258,14 @@ class DownloadWorker(QThread):
         try:
             for url in urls:
                 try:
+                    temp_path.unlink(missing_ok=True)
+                    if _parallel_download(url, temp_path, self.progress.emit):
+                        digest = hashlib.sha256(temp_path.read_bytes())
+                        if expected and digest.hexdigest().lower() != expected:
+                            raise ValueError("下载文件校验失败")
+                        self.progress.emit(100)
+                        self.completed.emit(str(temp_path))
+                        return
                     temp_path.unlink(missing_ok=True)
                     response = requests.get(
                         url,
