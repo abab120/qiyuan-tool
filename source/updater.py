@@ -4,6 +4,7 @@ import os
 import subprocess
 import sys
 import tempfile
+import shutil
 from pathlib import Path
 
 import requests
@@ -11,7 +12,7 @@ from PyQt5.QtCore import QThread, QTimer, pyqtSignal
 from PyQt5.QtWidgets import QMessageBox, QApplication
 
 
-CURRENT_VERSION = "1.3.4"
+CURRENT_VERSION = "1.3.5"
 # Upload a toolbox EXE asset to this repository to publish updates.
 DEFAULT_RELEASE_API = "https://api.github.com/repos/abab120/qiyuan-tool/releases/latest"
 
@@ -41,6 +42,22 @@ def _manifest_url():
     return os.environ.get("QJ_TOOLBOX_UPDATE_URL", DEFAULT_RELEASE_API)
 
 
+def _run_hidden(args):
+    startupinfo = None
+    if sys.platform == "win32":
+        startupinfo = subprocess.STARTUPINFO()
+        startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+        startupinfo.wShowWindow = subprocess.SW_HIDE
+    return subprocess.run(
+        args,
+        capture_output=True,
+        timeout=30,
+        startupinfo=startupinfo,
+        creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+        check=True,
+    )
+
+
 def _powershell_request(url, output_path=None):
     """Use Windows' Schannel certificate store when Python's CA bundle is unavailable."""
     escaped_url = str(url).replace("'", "''")
@@ -56,13 +73,27 @@ def _powershell_request(url, output_path=None):
             "$ProgressPreference='SilentlyContinue'; "
             f"Invoke-WebRequest -UseBasicParsing -Uri '{escaped_url}' -OutFile '{escaped_path}'"
         )
-    result = subprocess.run(
+    result = _run_hidden(
         ["powershell.exe", "-NoProfile", "-NonInteractive", "-Command", script],
-        capture_output=True,
-        timeout=30,
-        check=True,
     )
     return result.stdout.decode("utf-8-sig", errors="replace") if output_path is None else None
+
+
+def _native_request(url, output_path=None):
+    """Use Windows Schannel clients without opening a console window."""
+    curl = shutil.which("curl.exe") or shutil.which("curl")
+    if curl:
+        args = [curl, "--fail", "--silent", "--show-error", "--location", "--max-time", "25", "--user-agent", "QiyuanToolbox"]
+        if output_path is None:
+            args.append(str(url))
+        else:
+            args.extend(["--output", str(output_path), str(url)])
+        try:
+            result = _run_hidden(args)
+            return result.stdout.decode("utf-8-sig", errors="replace") if output_path is None else None
+        except (OSError, subprocess.CalledProcessError):
+            pass
+    return _powershell_request(url, output_path)
 
 
 def _read_release(data):
@@ -107,8 +138,8 @@ class CheckWorker(QThread):
                 )
                 response.raise_for_status()
                 payload = response.json()
-            except requests.exceptions.SSLError:
-                payload = json.loads(_powershell_request(_manifest_url()))
+            except requests.exceptions.RequestException:
+                payload = json.loads(_native_request(_manifest_url()))
             manifest = _read_release(payload)
             self.checked.emit(manifest)
             if manifest and _version(manifest.get("version")) > _version(CURRENT_VERSION):
@@ -149,8 +180,8 @@ class DownloadWorker(QThread):
                         received += len(chunk)
                         if total:
                             self.progress.emit(min(100, received * 100 // total))
-            except requests.exceptions.SSLError:
-                _powershell_request(self.manifest["url"], temp_path)
+            except requests.exceptions.RequestException:
+                _native_request(self.manifest["url"], temp_path)
                 digest = hashlib.sha256(temp_path.read_bytes())
                 self.progress.emit(100)
             expected = str(self.manifest.get("sha256", "")).lower().replace("sha256:", "")
