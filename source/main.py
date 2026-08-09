@@ -1,6 +1,8 @@
 import marshal
 import os
+import shutil
 import sys
+import tempfile
 import types
 from pathlib import Path
 
@@ -26,7 +28,7 @@ def load_raw(name):
 import psutil  # noqa: F401
 import updater
 from PyQt5.QtGui import QIcon
-from PyQt5.QtCore import QTimer, Qt
+from PyQt5.QtCore import QThread, QTimer, Qt, pyqtSignal
 from PyQt5.QtWidgets import (
     QApplication,
     QAbstractItemView,
@@ -34,6 +36,7 @@ from PyQt5.QtWidgets import (
     QLabel,
     QMessageBox,
     QPushButton,
+    QProgressBar,
     QTableWidget,
     QTableWidgetItem,
     QTextEdit,
@@ -230,6 +233,203 @@ class AboutPanel(QWidget):
         self.status.setText("更新状态：检查失败，请确认网络连接")
 
 
+class DiskCleanupWorker(QThread):
+    scanned = pyqtSignal(object)
+    completed = pyqtSignal(int, int)
+    failed = pyqtSignal(str)
+
+    def __init__(self, targets, cleanup=False, parent=None):
+        super().__init__(parent)
+        self.targets = targets
+        self.cleanup = cleanup
+
+    def _files(self, target):
+        root = target["path"]
+        if target["kind"] == "glob":
+            if root.exists():
+                yield from (path for path in root.glob(target["pattern"]) if path.is_file())
+            return
+        if not root.exists():
+            return
+        current_mei = Path(getattr(sys, "_MEIPASS", "")).resolve()
+        for path in root.rglob("*"):
+            if not path.is_file():
+                continue
+            try:
+                if current_mei and current_mei != Path(".").resolve() and current_mei in path.parents:
+                    continue
+            except OSError:
+                continue
+            yield path
+
+    def run(self):
+        try:
+            results = []
+            removed_bytes = 0
+            removed_files = 0
+            for target in self.targets:
+                size = 0
+                files = list(self._files(target))
+                for path in files:
+                    try:
+                        size += path.stat().st_size
+                    except OSError:
+                        continue
+                results.append({"key": target["key"], "size": size, "files": len(files)})
+                if self.cleanup:
+                    for path in files:
+                        try:
+                            amount = path.stat().st_size
+                            path.unlink()
+                            removed_bytes += amount
+                            removed_files += 1
+                        except (OSError, PermissionError):
+                            continue
+                    if target["kind"] == "tree" and target["path"].exists():
+                        for directory in sorted(target["path"].rglob("*"), reverse=True):
+                            if directory.is_dir():
+                                try:
+                                    directory.rmdir()
+                                except OSError:
+                                    pass
+            if self.cleanup:
+                self.completed.emit(removed_bytes, removed_files)
+            else:
+                self.scanned.emit(results)
+        except Exception as exc:
+            self.failed.emit(str(exc))
+
+
+class DiskCleanupPanel(QWidget):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.worker = None
+        self.rows = {}
+        local_app_data = Path(os.environ.get("LOCALAPPDATA", tempfile.gettempdir()))
+        self.targets = [
+            {"key": "user_temp", "name": "用户临时文件", "path": Path(tempfile.gettempdir()), "kind": "tree", "default": True},
+            {"key": "windows_temp", "name": "Windows 临时文件", "path": Path(os.environ.get("WINDIR", "C:\\Windows")) / "Temp", "kind": "tree", "default": False},
+            {"key": "thumbcache", "name": "缩略图缓存", "path": local_app_data / "Microsoft" / "Windows" / "Explorer", "kind": "glob", "pattern": "thumbcache*.db", "default": False},
+        ]
+        layout = QVBoxLayout(self)
+        title = QLabel("扫描并清理可重建的临时文件，不会删除文档、图片或项目文件")
+        title.setObjectName("contentStatus")
+        layout.addWidget(title)
+
+        self.table = QTableWidget(0, 3)
+        self.table.setHorizontalHeaderLabels(["清理", "项目", "占用空间"])
+        self.table.setSelectionMode(QAbstractItemView.NoSelection)
+        self.table.setEditTriggers(QAbstractItemView.NoEditTriggers)
+        self.table.verticalHeader().setVisible(False)
+        self.table.horizontalHeader().setStretchLastSection(True)
+        layout.addWidget(self.table, 1)
+
+        self.progress = QProgressBar()
+        self.progress.setRange(0, 100)
+        self.progress.setValue(0)
+        self.progress.setVisible(False)
+        layout.addWidget(self.progress)
+        self.status = QLabel("准备扫描")
+        layout.addWidget(self.status)
+
+        buttons = QHBoxLayout()
+        self.scan_button = QPushButton("扫描磁盘")
+        self.scan_button.clicked.connect(self.scan)
+        self.clean_button = QPushButton("清理选中")
+        self.clean_button.clicked.connect(self.clean)
+        self.clean_button.setEnabled(False)
+        buttons.addWidget(self.scan_button)
+        buttons.addWidget(self.clean_button)
+        buttons.addStretch(1)
+        layout.addLayout(buttons)
+        QTimer.singleShot(100, self.scan)
+
+    @staticmethod
+    def _format_size(size):
+        if size >= 1024 ** 3:
+            return f"{size / 1024 ** 3:.2f} GB"
+        if size >= 1024 ** 2:
+            return f"{size / 1024 ** 2:.1f} MB"
+        return f"{size / 1024:.1f} KB"
+
+    def _set_busy(self, busy, message):
+        self.scan_button.setEnabled(not busy)
+        self.clean_button.setEnabled(not busy and bool(self.rows))
+        self.progress.setVisible(busy)
+        if busy:
+            self.progress.setRange(0, 0)
+        else:
+            self.progress.setRange(0, 100)
+            self.progress.setValue(100)
+        self.status.setText(message)
+
+    def scan(self):
+        if self.worker and self.worker.isRunning():
+            return
+        self._set_busy(True, "正在扫描可清理文件...")
+        self.worker = DiskCleanupWorker(self.targets, parent=self)
+        self.worker.scanned.connect(self._on_scanned)
+        self.worker.failed.connect(self._on_failed)
+        self.worker.finished.connect(self._release_worker)
+        self.worker.start()
+
+    def _on_scanned(self, results):
+        self.table.setRowCount(0)
+        self.rows = {}
+        for result, target in zip(results, self.targets):
+            row = self.table.rowCount()
+            self.table.insertRow(row)
+            check = QTableWidgetItem()
+            check.setFlags(Qt.ItemIsEnabled | Qt.ItemIsUserCheckable)
+            check.setCheckState(Qt.Checked if target.get("default") else Qt.Unchecked)
+            self.table.setItem(row, 0, check)
+            self.table.setItem(row, 1, QTableWidgetItem(target["name"]))
+            self.table.setItem(row, 2, QTableWidgetItem(self._format_size(result["size"])))
+            self.rows[target["key"]] = (row, result["size"])
+        total = sum(item[1] for item in self.rows.values())
+        self._set_busy(False, f"扫描完成，可清理 {self._format_size(total)}")
+
+    def _selected_targets(self):
+        selected = []
+        for target in self.targets:
+            row_info = self.rows.get(target["key"])
+            if row_info and self.table.item(row_info[0], 0).checkState() == Qt.Checked:
+                selected.append(target)
+        return selected
+
+    def clean(self):
+        selected = self._selected_targets()
+        total = sum(self.rows[target["key"]][1] for target in selected)
+        if not selected or total <= 0:
+            QMessageBox.information(self, "磁盘清理", "没有可清理的已选项目。")
+            return
+        answer = QMessageBox.question(
+            self,
+            "确认清理",
+            f"确定清理选中的 {self._format_size(total)} 临时文件吗？\n正在使用的文件会自动跳过。",
+            QMessageBox.Yes | QMessageBox.No,
+            QMessageBox.No,
+        )
+        if answer != QMessageBox.Yes:
+            return
+        self._set_busy(True, "正在清理文件...")
+        self.worker = DiskCleanupWorker(selected, cleanup=True, parent=self)
+        self.worker.completed.connect(self._on_cleaned)
+        self.worker.failed.connect(self._on_failed)
+        self.worker.finished.connect(self._release_worker)
+        self.worker.start()
+
+    def _on_cleaned(self, amount, files):
+        self._set_busy(False, f"已清理 {files} 个文件，释放 {self._format_size(amount)}")
+        QTimer.singleShot(200, self.scan)
+
+    def _on_failed(self, error):
+        self._set_busy(False, f"扫描失败：{error}")
+
+    def _release_worker(self):
+        self.worker = None
+
+
 def _load_panels(window):
     launcher = load_raw("launcher")
     reaction_test = load_raw("reaction_test")
@@ -257,6 +457,10 @@ def _load_panels(window):
     window.ai_panel = ai
     window.tab_widget.insertTab(0, ai, "AI 助手")
     window.tab_widget.setCurrentWidget(ai)
+
+    cleanup = DiskCleanupPanel(window)
+    window.cleanup_panel = cleanup
+    window.tab_widget.addTab(cleanup, "磁盘清理")
 
     window._updater = updater.Updater(window)
     about = AboutPanel(window._updater, window)
