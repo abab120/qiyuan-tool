@@ -243,14 +243,25 @@ class Updater:
             QMessageBox.information(self.parent, "更新提示", "开发模式不会替换 Python 解释器，请在打包后的 EXE 中更新。")
             return
         current = Path(sys.executable).resolve()
-        script = Path(tempfile.gettempdir()) / "qj_apply_update.cmd"
+        script = Path(tempfile.gettempdir()) / f"qj_apply_update_{os.getpid()}.cmd"
         script.write_text(
             "@echo off\r\n"
+            "setlocal\r\n"
             "timeout /t 2 /nobreak >nul\r\n"
+            ":retry\r\n"
             f'copy /y "{downloaded}" "{current}" >nul\r\n'
-            f'start "" "{current}"\r\n'
+            "if errorlevel 1 (\r\n"
+            "  timeout /t 1 /nobreak >nul\r\n"
+            "  goto retry\r\n"
+            ")\r\n"
+            f'del /q "{downloaded}" >nul 2>nul\r\n'
             f'del "%~f0"\r\n',
             encoding="mbcs",
+        )
+        QMessageBox.information(
+            self.parent,
+            "更新完成",
+            "更新文件已准备完成。点击“确定”退出程序，然后重新打开工具箱。",
         )
         subprocess.Popen(["cmd.exe", "/c", str(script)], creationflags=0x08000000)
         QApplication.instance().quit()
