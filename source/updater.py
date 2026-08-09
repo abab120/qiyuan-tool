@@ -10,8 +10,8 @@ from urllib.parse import urlparse
 from pathlib import Path
 
 import requests
-from PyQt5.QtCore import QThread, QTimer, pyqtSignal
-from PyQt5.QtWidgets import QMessageBox, QApplication
+from PyQt5.QtCore import QThread, QTimer, Qt, pyqtSignal
+from PyQt5.QtWidgets import QMessageBox, QApplication, QProgressDialog
 
 
 CURRENT_VERSION = "1.0.0"
@@ -254,6 +254,7 @@ class Updater:
         self.checker = None
         self.downloader = None
         self.manifest = None
+        self.progress_dialog = None
 
     def schedule(self):
         QTimer.singleShot(1800, self.check)
@@ -281,13 +282,42 @@ class Updater:
         self.manifest = manifest
         message = f"发现新版本 {manifest.get('version')}，当前版本为 {CURRENT_VERSION}。\n\n现在下载并更新吗？"
         if QMessageBox.question(self.parent, "发现更新", message, QMessageBox.Yes | QMessageBox.No) == QMessageBox.Yes:
+            self._show_progress_dialog()
             self.downloader = DownloadWorker(manifest, self.parent)
-            self.downloader.progress.connect(lambda value: self.parent.statusBar().showMessage(f"正在下载更新 {value}%"))
+            self.downloader.progress.connect(self._on_download_progress)
             self.downloader.completed.connect(self._apply)
-            self.downloader.failed.connect(lambda error: QMessageBox.warning(self.parent, "更新失败", error))
+            self.downloader.failed.connect(self._on_download_failed)
             self.downloader.start()
 
+    def _show_progress_dialog(self):
+        self.progress_dialog = QProgressDialog("正在准备下载更新... 0%", "", 0, 100, self.parent)
+        self.progress_dialog.setWindowTitle("下载更新")
+        self.progress_dialog.setWindowModality(Qt.WindowModal)
+        self.progress_dialog.setAutoClose(False)
+        self.progress_dialog.setAutoReset(False)
+        self.progress_dialog.setMinimumDuration(0)
+        self.progress_dialog.setCancelButton(None)
+        self.progress_dialog.setValue(0)
+        self.progress_dialog.show()
+
+    def _on_download_progress(self, value):
+        if self.progress_dialog is not None:
+            self.progress_dialog.setLabelText(f"正在下载更新... {value}%")
+            self.progress_dialog.setValue(value)
+        self.parent.statusBar().showMessage(f"正在下载更新 {value}%")
+
+    def _close_progress_dialog(self):
+        if self.progress_dialog is not None:
+            self.progress_dialog.close()
+            self.progress_dialog.deleteLater()
+            self.progress_dialog = None
+
+    def _on_download_failed(self, error):
+        self._close_progress_dialog()
+        QMessageBox.warning(self.parent, "更新失败", error)
+
     def _apply(self, downloaded):
+        self._close_progress_dialog()
         if not getattr(sys, "frozen", False):
             QMessageBox.information(self.parent, "更新提示", "开发模式不会替换 Python 解释器，请在打包后的 EXE 中更新。")
             return
