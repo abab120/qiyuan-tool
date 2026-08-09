@@ -204,6 +204,25 @@ class AboutPanel(QWidget):
         info.setObjectName("aboutInfo")
         layout.addWidget(info)
 
+        changelog_title = QLabel("更新日志")
+        changelog_title.setObjectName("contentTitle")
+        layout.addWidget(changelog_title)
+        self.changelog = QTextEdit()
+        self.changelog.setReadOnly(True)
+        self.changelog.setMaximumHeight(190)
+        self.changelog.setPlainText(
+            "v1.2.0\n"
+            "• 磁盘清理支持选择不同磁盘，并重新整理清理界面\n"
+            "• 移除常用库管理模块，关于页面移动到末尾\n"
+            "• 下载页增加微信、QQ 内置浏览器提示\n\n"
+            "v1.1.0\n"
+            "• 增加分类磁盘清理、浏览器缓存和应用缓存扫描\n"
+            "• 更新安装完成后自动替换、重启并清理旧文件\n\n"
+            "v1.0.0\n"
+            "• 首个统一版工具箱发布"
+        )
+        layout.addWidget(self.changelog)
+
         self.status = QLabel("更新状态：尚未检查")
         self.status.setObjectName("contentStatus")
         layout.addWidget(self.status)
