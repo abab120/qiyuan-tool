@@ -463,6 +463,7 @@ class Updater:
             "  timeout /t 1 /nobreak >nul\r\n"
             "  goto retry\r\n"
             ")\r\n"
+            'set "QIYUAN_ALLOW_RELAUNCH=1"\r\n'
             f'start "" "{current}"\r\n'
             f'del /q "{old_copy}" >nul 2>nul\r\n'
             f'del /q "{downloaded}" >nul 2>nul\r\n'
