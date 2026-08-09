@@ -909,11 +909,14 @@ def _load_panels(window):
 
 def main():
     app = QApplication(sys.argv)
-    instance_guard, instance_error = _acquire_instance_guard()
-    if instance_guard is None:
-        QMessageBox.warning(None, "柒悁工具箱", instance_error)
-        return 1
-    app._instance_guard = instance_guard
+    if os.environ.get("QIYUAN_ALLOW_RELAUNCH") == "1":
+        app._instance_guard = None
+    else:
+        instance_guard, instance_error = _acquire_instance_guard()
+        if instance_guard is None:
+            QMessageBox.warning(None, "柒悁工具箱", instance_error)
+            return 1
+        app._instance_guard = instance_guard
     app.setApplicationName("柒悁工具箱")
     app.setStyle("Fusion")
     icon = resource_path("favicon.ico")
