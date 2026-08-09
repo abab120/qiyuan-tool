@@ -183,7 +183,7 @@ def _install_process_manager():
 _install_process_manager()
 
 
-CURRENT_VERSION = "1.3.5"
+CURRENT_VERSION = "1.0.0"
 OPEN_SOURCE_URL = "https://github.com/abab120/qiyuan-tool"
 
 
