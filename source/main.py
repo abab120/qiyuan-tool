@@ -224,7 +224,7 @@ def _install_process_manager():
 _install_process_manager()
 
 
-CURRENT_VERSION = "1.2.7"
+CURRENT_VERSION = "1.2.8"
 OPEN_SOURCE_URL = "https://github.com/abab120/qiyuan-tool"
 
 
@@ -254,6 +254,8 @@ class AboutPanel(QWidget):
         self.changelog.setReadOnly(True)
         self.changelog.setMaximumHeight(190)
         self.changelog.setPlainText(
+            "v1.2.8\n"
+            "• 修复嘉豪专区线框和双层爱心样式导致的 Qt 崩溃\n\n"
             "v1.2.7\n"
             "• 更新后自动切换到新版本 EXE 文件名，并降低替换阶段崩溃风险\n\n"
             "v1.2.6\n"
