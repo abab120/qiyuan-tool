@@ -8,7 +8,7 @@ import random
 import time
 
 from PyQt5.QtCore import QPoint, QRect, QTimer, Qt
-from PyQt5.QtGui import QColor, QPainter, QPainterPath, QPen
+from PyQt5.QtGui import QColor, QPainter, QPen
 from PyQt5.QtWidgets import (
     QCheckBox,
     QComboBox,
@@ -97,10 +97,7 @@ class AimBoard(QWidget):
     def paintEvent(self, event):
         painter = QPainter(self)
         painter.setRenderHint(QPainter.Antialiasing)
-        clip = QPainterPath()
-        clip.addRoundedRect(self.rect().adjusted(1, 1, -1, -1), 14, 14)
-        painter.setClipPath(clip)
-        painter.fillPath(clip, QColor("#f7faf8"))
+        painter.fillRect(self.rect(), QColor("#f7faf8"))
         if self.target.isValid() and self.active:
             center = self.target.center()
             painter.setPen(QPen(QColor("#159463"), 2))
