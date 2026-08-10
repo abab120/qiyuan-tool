@@ -21,7 +21,7 @@ from PyQt5.QtWidgets import QMessageBox, QApplication, QProgressDialog
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 
-CURRENT_VERSION = "1.2.6"
+CURRENT_VERSION = "1.2.7"
 # Upload a toolbox EXE asset to this repository to publish updates.
 DEFAULT_RELEASE_API = "https://gitee.com/api/v5/repos/xiaoqi313/qiyuan-tool/releases/latest"
 FALLBACK_RELEASE_API = "https://api.github.com/repos/abab120/qiyuan-tool/releases/latest"
@@ -133,6 +133,7 @@ def _read_release(data):
     download_url = asset.get("browser_download_url")
     return {
         "version": version,
+        "filename": str(asset.get("name", "")),
         "url": download_url,
         "mirrors": _mirror_urls(download_url),
         "sha256": digest,
@@ -444,9 +445,44 @@ class Updater:
             QMessageBox.information(self.parent, "更新提示", "开发模式不会替换 Python 解释器，请在打包后的 EXE 中更新。")
             return
         current = Path(sys.executable).resolve()
+        version_text = str(self.manifest.get("version", CURRENT_VERSION)).lstrip("vV")
+        versioned_name = re.match(r"^toolbox-v\d+\.\d+\.\d+\.exe$", current.name, re.IGNORECASE)
+        target = current.with_name(f"Toolbox-v{version_text}.exe") if versioned_name else current
         old_copy = current.with_name(current.name + ".old")
         script = Path(tempfile.gettempdir()) / f"qj_apply_update_{os.getpid()}.cmd"
-        script.write_text(
+        if target != current:
+            install_steps = (
+                f'del /q "{target}" >nul 2>nul\r\n'
+                f'copy /y "{downloaded}" "{target}" >nul 2>nul\r\n'
+                "if errorlevel 1 (\r\n"
+                "  timeout /t 1 /nobreak >nul\r\n"
+                "  goto retry\r\n"
+                ")\r\n"
+                'set "QIYUAN_ALLOW_RELAUNCH=1"\r\n'
+                f'start "" /d "{target.parent}" "{target}"\r\n'
+                "timeout /t 3 /nobreak >nul\r\n"
+                f'del /q "{current}" >nul 2>nul\r\n'
+            )
+        else:
+            install_steps = (
+                f'del /q "{old_copy}" >nul 2>nul\r\n'
+                f'move /y "{current}" "{old_copy}" >nul 2>nul\r\n'
+                "if errorlevel 1 (\r\n"
+                "  timeout /t 1 /nobreak >nul\r\n"
+                "  goto retry\r\n"
+                ")\r\n"
+                f'copy /y "{downloaded}" "{current}" >nul 2>nul\r\n'
+                "if errorlevel 1 (\r\n"
+                f'  move /y "{old_copy}" "{current}" >nul 2>nul\r\n'
+                "  timeout /t 1 /nobreak >nul\r\n"
+                "  goto retry\r\n"
+                ")\r\n"
+                'set "QIYUAN_ALLOW_RELAUNCH=1"\r\n'
+                f'start "" /d "{current.parent}" "{current}"\r\n'
+                "timeout /t 3 /nobreak >nul\r\n"
+                f'del /q "{old_copy}" >nul 2>nul\r\n'
+            )
+        script_body = (
             "@echo off\r\n"
             "setlocal\r\n"
             f'set "PARENT_PID={os.getpid()}"\r\n'
@@ -457,26 +493,11 @@ class Updater:
             "  goto wait_parent\r\n"
             ")\r\n"
             ":retry\r\n"
-            f'del /q "{old_copy}" >nul 2>nul\r\n'
-            f'move /y "{current}" "{old_copy}" >nul 2>nul\r\n'
-            "if errorlevel 1 (\r\n"
-            "  timeout /t 1 /nobreak >nul\r\n"
-            "  goto retry\r\n"
-            ")\r\n"
-            f'copy /y "{downloaded}" "{current}" >nul 2>nul\r\n'
-            "if errorlevel 1 (\r\n"
-            f'  move /y "{old_copy}" "{current}" >nul 2>nul\r\n'
-            "  timeout /t 1 /nobreak >nul\r\n"
-            "  goto retry\r\n"
-            ")\r\n"
-            'set "QIYUAN_ALLOW_RELAUNCH=1"\r\n'
-            f'start "" /d "{current.parent}" "{current}"\r\n'
-            "timeout /t 3 /nobreak >nul\r\n"
-            f'del /q "{old_copy}" >nul 2>nul\r\n'
-            f'del /q "{downloaded}" >nul 2>nul\r\n'
-            f'del "%~f0"\r\n',
-            encoding="mbcs",
+            + install_steps
+            + f'del /q "{downloaded}" >nul 2>nul\r\n'
+            + f'del "%~f0"\r\n'
         )
+        script.write_text(script_body, encoding="mbcs")
         QMessageBox.information(
             self.parent,
             "更新完成",
