@@ -4,8 +4,8 @@ import random
 import time
 from pathlib import Path
 
-from PyQt5.QtCore import QTimer, Qt
-from PyQt5.QtGui import QColor, QFont, QPainter, QPainterPath, QPen
+from PyQt5.QtCore import QTimer, Qt, QPointF
+from PyQt5.QtGui import QColor, QFont, QPainter, QPen, QPolygonF
 from PyQt5.QtWidgets import (
     QGroupBox,
     QHBoxLayout,
@@ -60,11 +60,7 @@ class HeartCanvas(QWidget):
     def paintEvent(self, event):
         painter = QPainter(self)
         painter.setRenderHint(QPainter.Antialiasing)
-        # Clip the drawing surface so the dark background follows the rounded frame.
-        clip = QPainterPath()
-        clip.addRoundedRect(self.rect().adjusted(1, 1, -1, -1), 14, 14)
-        painter.setClipPath(clip)
-        painter.fillPath(clip, QColor("#171b24"))
+        painter.fillRect(self.rect(), QColor("#171b24"))
 
         elapsed = time.monotonic() - self.started
         pulse = 1.0 + 0.035 * math.sin(elapsed * 3.2) if self.running else 1.0
@@ -98,18 +94,15 @@ class HeartCanvas(QWidget):
         if self.style_name in {"outline", "double"}:
             painter.setPen(QPen(QColor(red, green, blue, 220), 2.2))
             for outline_scale in (1.0, 0.76) if self.style_name == "double" else (1.0,):
-                path = QPainterPath()
+                points = []
                 for index in range(101):
                     angle = math.tau * index / 100
                     x = 16 * math.sin(angle) ** 3
                     y = 13 * math.cos(angle) - 5 * math.cos(2 * angle) - 2 * math.cos(3 * angle) - math.cos(4 * angle)
                     px = center_x + x * scale * outline_scale * pulse
                     py = center_y - y * scale * outline_scale * pulse
-                    if index == 0:
-                        path.moveTo(px, py)
-                    else:
-                        path.lineTo(px, py)
-                painter.drawPath(path)
+                    points.append(QPointF(px, py))
+                painter.drawPolyline(QPolygonF(points))
 
         painter.setPen(QColor(255, 225, 236))
         font = QFont("Microsoft YaHei", 16)
