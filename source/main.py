@@ -45,7 +45,10 @@ from PyQt5.QtWidgets import (
     QMessageBox,
     QPushButton,
     QProgressBar,
+    QDoubleSpinBox,
+    QLineEdit,
     QScrollArea,
+    QSpinBox,
     QTableWidget,
     QTableWidgetItem,
     QTextEdit,
@@ -224,7 +227,7 @@ def _install_process_manager():
 _install_process_manager()
 
 
-CURRENT_VERSION = "1.2.9"
+CURRENT_VERSION = "1.3.0"
 OPEN_SOURCE_URL = "https://github.com/abab120/qiyuan-tool"
 
 
@@ -254,6 +257,8 @@ class AboutPanel(QWidget):
         self.changelog.setReadOnly(True)
         self.changelog.setMaximumHeight(190)
         self.changelog.setPlainText(
+            "v1.3.0\n"
+            "• 修复旧页面输入框高度和卡片布局错位，爱心样式增加旋转动画\n\n"
             "v1.2.9\n"
             "• 统一重写页面 UI，调整侧栏、标题区、卡片、表单和按钮间距\n\n"
             "v1.2.8\n"
@@ -960,6 +965,15 @@ def _polish_panel_spacing(root):
     for form in root.findChildren(QFormLayout):
         form.setVerticalSpacing(max(10, form.verticalSpacing()))
         form.setHorizontalSpacing(max(12, form.horizontalSpacing()))
+    for grid in root.findChildren(QGridLayout):
+        grid.setVerticalSpacing(max(10, grid.verticalSpacing()))
+        grid.setHorizontalSpacing(max(12, grid.horizontalSpacing()))
+    # Several legacy pages set a fixed height of 8-14 px on editor widgets.
+    # Clear those constraints so the shared style can provide usable controls.
+    for control in root.findChildren((QLineEdit, QComboBox, QSpinBox, QDoubleSpinBox)):
+        control.setMinimumHeight(max(34, control.minimumHeight()))
+        if control.maximumHeight() < 34:
+            control.setMaximumHeight(16777215)
     for group in root.findChildren(QGroupBox):
         layout = group.layout()
         if layout is None:
@@ -973,6 +987,19 @@ def _polish_panel_spacing(root):
         )
         if layout.spacing() < 10:
             layout.setSpacing(10)
+        # Give legacy cards enough height for their now-readable controls.
+        hint_height = group.sizeHint().height()
+        if hint_height > group.minimumHeight():
+            group.setMinimumHeight(hint_height)
+        parent_layout = group.parentWidget().layout() if group.parentWidget() else None
+        if parent_layout is not None:
+            parent_layout.invalidate()
+            parent_layout.activate()
+    for page in root.findChildren(QWidget):
+        page_layout = page.layout()
+        if page_layout is not None:
+            page_layout.invalidate()
+            page_layout.activate()
 
 
 APP_STYLE = """
