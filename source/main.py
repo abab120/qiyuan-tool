@@ -227,7 +227,7 @@ def _install_process_manager():
 _install_process_manager()
 
 
-CURRENT_VERSION = "1.3.0"
+CURRENT_VERSION = "1.3.1"
 OPEN_SOURCE_URL = "https://github.com/abab120/qiyuan-tool"
 
 
@@ -257,6 +257,8 @@ class AboutPanel(QWidget):
         self.changelog.setReadOnly(True)
         self.changelog.setMaximumHeight(190)
         self.changelog.setPlainText(
+            "v1.3.1\n"
+            "• 二次回算卡片布局，避免 AI 设置区相互贴合\n\n"
             "v1.3.0\n"
             "• 修复旧页面输入框高度和卡片布局错位，爱心样式增加旋转动画\n\n"
             "v1.2.9\n"
@@ -958,6 +960,8 @@ def _load_panels(window):
     window.tab_widget.addTab(cleanup, "磁盘清理")
     window.tab_widget.addTab(about, "关于")
     _polish_panel_spacing(window)
+    # A second pass is needed after the stacked page receives its real size.
+    QTimer.singleShot(0, lambda: _polish_panel_spacing(window))
 
 
 def _polish_panel_spacing(root):
@@ -968,6 +972,10 @@ def _polish_panel_spacing(root):
     for grid in root.findChildren(QGridLayout):
         grid.setVerticalSpacing(max(10, grid.verticalSpacing()))
         grid.setHorizontalSpacing(max(12, grid.horizontalSpacing()))
+    for vertical in root.findChildren(QVBoxLayout):
+        vertical.setSpacing(max(12, vertical.spacing()))
+    for horizontal in root.findChildren(QHBoxLayout):
+        horizontal.setSpacing(max(10, horizontal.spacing()))
     # Several legacy pages set a fixed height of 8-14 px on editor widgets.
     # Clear those constraints so the shared style can provide usable controls.
     for control in root.findChildren((QLineEdit, QComboBox, QSpinBox, QDoubleSpinBox)):
@@ -1044,7 +1052,7 @@ QListWidget#sidebarNav::item:selected {
     font-weight: 700;
 }
 QGroupBox {
-    margin-top: 18px;
+    margin-top: 0px;
     padding: 16px 14px 14px;
     background: #ffffff;
     border: 1px solid #dce6e0;
