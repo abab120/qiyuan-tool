@@ -224,7 +224,7 @@ def _install_process_manager():
 _install_process_manager()
 
 
-CURRENT_VERSION = "1.2.8"
+CURRENT_VERSION = "1.2.9"
 OPEN_SOURCE_URL = "https://github.com/abab120/qiyuan-tool"
 
 
@@ -254,6 +254,8 @@ class AboutPanel(QWidget):
         self.changelog.setReadOnly(True)
         self.changelog.setMaximumHeight(190)
         self.changelog.setPlainText(
+            "v1.2.9\n"
+            "• 统一重写页面 UI，调整侧栏、标题区、卡片、表单和按钮间距\n\n"
             "v1.2.8\n"
             "• 修复嘉豪专区线框和双层爱心样式导致的 Qt 崩溃\n\n"
             "v1.2.7\n"
@@ -972,6 +974,97 @@ def _polish_panel_spacing(root):
         if layout.spacing() < 10:
             layout.setSpacing(10)
 
+
+APP_STYLE = """
+QMainWindow { background: #f3f6f4; }
+QFrame#sidebarFrame {
+    margin: 12px 0 12px 12px;
+    background: #ffffff;
+    border: 1px solid #e1e8e4;
+    border-radius: 14px;
+}
+QFrame#contentFrame {
+    margin: 12px;
+    background: #f3f6f4;
+    border: 1px solid #e1e8e4;
+    border-radius: 14px;
+}
+QFrame#contentHeader {
+    min-height: 58px;
+    padding: 8px 18px;
+    background: #ffffff;
+    border-bottom: 1px solid #e4ebe7;
+    border-radius: 14px 14px 0 0;
+}
+QLabel#contentTitle { font-size: 17px; font-weight: 700; color: #17231d; }
+QLabel#contentStatus { color: #6d7d73; }
+QListWidget#sidebarNav {
+    padding: 10px 8px;
+    background: transparent;
+    border: 0;
+}
+QListWidget#sidebarNav::item {
+    min-height: 38px;
+    padding: 7px 14px;
+    margin: 3px 0;
+    border-radius: 9px;
+    color: #53635a;
+}
+QListWidget#sidebarNav::item:hover { background: #f0f5f2; color: #1b6d46; }
+QListWidget#sidebarNav::item:selected {
+    color: #167447;
+    background: #e4f4ea;
+    font-weight: 700;
+}
+QGroupBox {
+    margin-top: 18px;
+    padding: 16px 14px 14px;
+    background: #ffffff;
+    border: 1px solid #dce6e0;
+    border-radius: 10px;
+    color: #26352c;
+    font-weight: 600;
+}
+QGroupBox::title {
+    subcontrol-origin: margin;
+    left: 14px;
+    padding: 0 6px;
+    background: #ffffff;
+}
+QLineEdit, QTextEdit, QPlainTextEdit, QComboBox,
+QSpinBox, QDoubleSpinBox, QListWidget, QTableWidget {
+    min-height: 34px;
+    padding: 5px 9px;
+    color: #1d2b23;
+    background: #ffffff;
+    border: 1px solid #cfdcd4;
+    border-radius: 8px;
+    selection-background-color: #d8f0e2;
+    selection-color: #155d3a;
+}
+QTextEdit, QPlainTextEdit, QListWidget, QTableWidget { padding: 7px; }
+QLineEdit:focus, QTextEdit:focus, QPlainTextEdit:focus,
+QComboBox:focus, QSpinBox:focus, QDoubleSpinBox:focus { border-color: #32a66c; }
+QPushButton {
+    min-height: 36px;
+    padding: 6px 14px;
+    color: #2c3d32;
+    background: #ffffff;
+    border: 1px solid #cfdcd4;
+    border-radius: 8px;
+}
+QPushButton:hover { background: #f0f8f3; border-color: #86c7a4; }
+QPushButton:pressed { background: #dff1e6; }
+QPushButton#primaryAction { color: #ffffff; background: #2aa568; border-color: #2aa568; font-weight: 700; }
+QPushButton#primaryAction:hover { background: #218b56; }
+QHeaderView::section { padding: 8px; background: #eef4f0; border: 0; color: #506158; }
+QProgressBar { min-height: 12px; border: 0; border-radius: 6px; background: #e5ede8; text-align: center; }
+QProgressBar::chunk { border-radius: 6px; background: #2aa568; }
+QScrollArea { border: 0; background: transparent; }
+QScrollBar:vertical { width: 10px; background: transparent; }
+QScrollBar::handle:vertical { min-height: 28px; border-radius: 5px; background: #c5d3ca; }
+"""
+
 def main():
     if sys.platform == "win32":
         try:
@@ -1088,6 +1181,9 @@ def main():
             border-radius: 10px;
         }
     """)
+    # The raw tool pages share this final style layer so every tab has the
+    # same spacing, control heights, and card treatment.
+    window.setStyleSheet(tool.WORKSPACE_STYLE + APP_STYLE)
     for label in window.findChildren(QLabel):
         if label.text().startswith("v1.2"):
             label.setText(f"v{CURRENT_VERSION} · 64 位")
