@@ -224,7 +224,7 @@ def _install_process_manager():
 _install_process_manager()
 
 
-CURRENT_VERSION = "1.2.5"
+CURRENT_VERSION = "1.2.6"
 OPEN_SOURCE_URL = "https://github.com/abab120/qiyuan-tool"
 
 
@@ -254,6 +254,8 @@ class AboutPanel(QWidget):
         self.changelog.setReadOnly(True)
         self.changelog.setMaximumHeight(190)
         self.changelog.setPlainText(
+            "v1.2.6\n"
+            "• 修复更新后 Python DLL 加载失败，等待旧进程完全退出再重启\n\n"
             "v1.2.5\n"
             "• 修复带版本号 EXE 的多开检测\n\n"
             "v1.2.4\n"
