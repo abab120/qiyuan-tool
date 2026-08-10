@@ -38,6 +38,8 @@ from PyQt5.QtWidgets import (
     QComboBox,
     QFrame,
     QGridLayout,
+    QFormLayout,
+    QGroupBox,
     QHBoxLayout,
     QLabel,
     QMessageBox,
@@ -65,6 +67,8 @@ def _acquire_instance_guard():
     except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
         bootloader_pid = 0
     process_names = {"toolbox", "toolbox.exe", "柒悁工具箱", "柒悁工具箱.exe"}
+    current_exe = Path(sys.executable).name.lower()
+    packaged_exe = current_exe not in {"python", "python.exe", "pythonw", "pythonw.exe"}
     for proc in psutil.process_iter(["pid", "name", "ppid"]):
         try:
             pid = int(proc.info["pid"])
@@ -72,7 +76,16 @@ def _acquire_instance_guard():
             # a child process with the same executable name. They are one launch.
             if pid in {current_pid, bootloader_pid} or int(proc.info.get("ppid") or 0) == current_pid:
                 continue
-            if (proc.info.get("name") or "").lower() in process_names:
+            name = (proc.info.get("name") or "").lower()
+            is_toolbox_name = name in process_names or (
+                packaged_exe and name == current_exe
+            )
+            if not is_toolbox_name and packaged_exe:
+                try:
+                    is_toolbox_name = Path(proc.exe()).name.lower() == current_exe
+                except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess, OSError):
+                    pass
+            if is_toolbox_name:
                 return None, "检测到柒悁工具箱已在后台运行，不允许多开。"
         except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess, TypeError, ValueError):
             continue
@@ -211,7 +224,7 @@ def _install_process_manager():
 _install_process_manager()
 
 
-CURRENT_VERSION = "1.2.4"
+CURRENT_VERSION = "1.2.5"
 OPEN_SOURCE_URL = "https://github.com/abab120/qiyuan-tool"
 
 
@@ -241,6 +254,8 @@ class AboutPanel(QWidget):
         self.changelog.setReadOnly(True)
         self.changelog.setMaximumHeight(190)
         self.changelog.setPlainText(
+            "v1.2.5\n"
+            "• 修复带版本号 EXE 的多开检测\n\n"
             "v1.2.4\n"
             "• 嘉豪专区改为视觉样式模板，增加留白和圆角画布\n"
             "• 修复点小球窗口缩放后的目标偏移\n\n"
@@ -929,6 +944,27 @@ def _load_panels(window):
     window.cleanup_panel = cleanup
     window.tab_widget.addTab(cleanup, "磁盘清理")
     window.tab_widget.addTab(about, "关于")
+    _polish_panel_spacing(window)
+
+
+def _polish_panel_spacing(root):
+    """Keep form rows readable across the raw and Python-built feature pages."""
+    for form in root.findChildren(QFormLayout):
+        form.setVerticalSpacing(max(10, form.verticalSpacing()))
+        form.setHorizontalSpacing(max(12, form.horizontalSpacing()))
+    for group in root.findChildren(QGroupBox):
+        layout = group.layout()
+        if layout is None:
+            continue
+        margins = layout.contentsMargins()
+        layout.setContentsMargins(
+            max(14, margins.left()),
+            max(16, margins.top()),
+            max(14, margins.right()),
+            max(14, margins.bottom()),
+        )
+        if layout.spacing() < 10:
+            layout.setSpacing(10)
 
 def main():
     if sys.platform == "win32":
@@ -1029,13 +1065,13 @@ def main():
         }
         QGroupBox {
             border-radius: 12px;
-            margin-top: 20px;
-            padding: 18px 16px 16px;
+            margin-top: 14px;
+            padding: 8px 10px 8px;
         }
         QGroupBox::title {
             subcontrol-origin: margin;
-            left: 14px;
-            padding: 0 6px;
+            left: 12px;
+            padding: 0 5px;
         }
         QListWidget#sidebarNav::item {
             padding: 11px 14px;
