@@ -21,7 +21,7 @@ from PyQt5.QtWidgets import QMessageBox, QApplication, QProgressDialog
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 
-CURRENT_VERSION = "1.2.5"
+CURRENT_VERSION = "1.2.6"
 # Upload a toolbox EXE asset to this repository to publish updates.
 DEFAULT_RELEASE_API = "https://gitee.com/api/v5/repos/xiaoqi313/qiyuan-tool/releases/latest"
 FALLBACK_RELEASE_API = "https://api.github.com/repos/abab120/qiyuan-tool/releases/latest"
@@ -449,7 +449,13 @@ class Updater:
         script.write_text(
             "@echo off\r\n"
             "setlocal\r\n"
-            "timeout /t 1 /nobreak >nul\r\n"
+            f'set "PARENT_PID={os.getpid()}"\r\n'
+            ":wait_parent\r\n"
+            "tasklist /fi \"PID eq %PARENT_PID%\" 2>nul | find \"%PARENT_PID%\" >nul\r\n"
+            "if not errorlevel 1 (\r\n"
+            "  timeout /t 1 /nobreak >nul\r\n"
+            "  goto wait_parent\r\n"
+            ")\r\n"
             ":retry\r\n"
             f'del /q "{old_copy}" >nul 2>nul\r\n'
             f'move /y "{current}" "{old_copy}" >nul 2>nul\r\n'
@@ -464,7 +470,8 @@ class Updater:
             "  goto retry\r\n"
             ")\r\n"
             'set "QIYUAN_ALLOW_RELAUNCH=1"\r\n'
-            f'start "" "{current}"\r\n'
+            f'start "" /d "{current.parent}" "{current}"\r\n'
+            "timeout /t 3 /nobreak >nul\r\n"
             f'del /q "{old_copy}" >nul 2>nul\r\n'
             f'del /q "{downloaded}" >nul 2>nul\r\n'
             f'del "%~f0"\r\n',
