@@ -64,6 +64,9 @@ class HeartCanvas(QWidget):
 
         elapsed = time.monotonic() - self.started
         pulse = 1.0 + 0.035 * math.sin(elapsed * 3.2) if self.running else 1.0
+        rotation = elapsed * 0.62 if self.running else 0.0
+        cos_rotation = math.cos(rotation)
+        sin_rotation = math.sin(rotation)
         scale = min(self.width(), self.height()) * 0.0145
         center_x = self.width() * 0.5
         center_y = self.height() * 0.43
@@ -80,8 +83,10 @@ class HeartCanvas(QWidget):
             x = 16 * math.sin(angle) ** 3
             y = 13 * math.cos(angle) - 5 * math.cos(2 * angle) - 2 * math.cos(3 * angle) - math.cos(4 * angle)
             drift = math.sin(elapsed * 2.0 + phase) * 0.22
-            px = center_x + (x * spread + drift) * scale * pulse
-            py = center_y - (y * spread) * scale * pulse
+            dx = (x * spread + drift) * scale * pulse
+            dy = (-y * spread) * scale * pulse
+            px = center_x + dx * cos_rotation - dy * sin_rotation
+            py = center_y + dx * sin_rotation + dy * cos_rotation
             alpha = int(125 + 95 * (0.5 + 0.5 * math.sin(elapsed * 2.8 + phase)))
             color = QColor(red, green, blue, max(80, min(230, alpha)))
             painter.setPen(QPen(color, radius))
@@ -99,8 +104,10 @@ class HeartCanvas(QWidget):
                     angle = math.tau * index / 100
                     x = 16 * math.sin(angle) ** 3
                     y = 13 * math.cos(angle) - 5 * math.cos(2 * angle) - 2 * math.cos(3 * angle) - math.cos(4 * angle)
-                    px = center_x + x * scale * outline_scale * pulse
-                    py = center_y - y * scale * outline_scale * pulse
+                    dx = x * scale * outline_scale * pulse
+                    dy = -y * scale * outline_scale * pulse
+                    px = center_x + dx * cos_rotation - dy * sin_rotation
+                    py = center_y + dx * sin_rotation + dy * cos_rotation
                     points.append(QPointF(px, py))
                 painter.drawPolyline(QPolygonF(points))
 
@@ -193,7 +200,7 @@ const canvas=document.getElementById("heart"),ctx=canvas.getContext("2d"),dots=[
 function resize(){{const d=devicePixelRatio||1;canvas.width=innerWidth*d;canvas.height=innerHeight*d;ctx.setTransform(d,0,0,d,0,0)}}
 function heart(t){{return [16*Math.sin(t)**3,13*Math.cos(t)-5*Math.cos(2*t)-2*Math.cos(3*t)-Math.cos(4*t)]}}
 for(let i=0;i<900;i++)dots.push([Math.random()*Math.PI*2,.72+Math.random()*.31,Math.random()*6.28,1.2+Math.random()*1.8]);
-function draw(now){{const e=(now-t0)/1000,pulse=1+.035*Math.sin(e*3.2),s=Math.min(innerWidth,innerHeight)*.0145,cx=innerWidth/2,cy=innerHeight*.43;ctx.clearRect(0,0,innerWidth,innerHeight);const colors={{particles:[242,88,143],neon:[75,210,255],gold:[255,190,75],double:[242,88,143],stars:[255,225,236],outline:[242,88,143]}};const c=colors[style]||colors.particles;for(const d of dots){{const p=heart(d[0]),drift=Math.sin(e*2+d[2])*.22,x=cx+(p[0]*d[1]+drift)*s*pulse,y=cy-p[1]*d[1]*s*pulse,a=.45+.35*(.5+.5*Math.sin(e*2.8+d[2]));ctx.fillStyle=`rgba(${{c[0]}},${{c[1]}},${{c[2]}},${{a}})`;ctx.beginPath();if(style==="stars"){{ctx.fillRect(x-d[3]*2,y-d[3]/2,d[3]*4,d[3]);ctx.fillRect(x-d[3]/2,y-d[3]*2,d[3],d[3]*4)}}else{{ctx.arc(x,y,d[3],0,Math.PI*2);ctx.fill()}}}}if(style==="outline"||style==="double"){{ctx.strokeStyle=`rgba(${{c[0]}},${{c[1]}},${{c[2]}},.9)`;ctx.lineWidth=2;for(const k of(style==="double"?[1,.76]:[1])){{ctx.beginPath();for(let i=0;i<=100;i++){{const p=heart(Math.PI*2*i/100),x=cx+p[0]*s*k*pulse,y=cy-p[1]*s*k*pulse;i?ctx.lineTo(x,y):ctx.moveTo(x,y)}}ctx.stroke()}}}}requestAnimationFrame(draw)}}
+function draw(now){{const e=(now-t0)/1000,pulse=1+.035*Math.sin(e*3.2),rotation=e*.62,s=Math.min(innerWidth,innerHeight)*.0145,cx=innerWidth/2,cy=innerHeight*.43;ctx.clearRect(0,0,innerWidth,innerHeight);const colors={{particles:[242,88,143],neon:[75,210,255],gold:[255,190,75],double:[242,88,143],stars:[255,225,236],outline:[242,88,143]}};const c=colors[style]||colors.particles;for(const d of dots){{const p=heart(d[0]),drift=Math.sin(e*2+d[2])*.22,dx=(p[0]*d[1]+drift)*s*pulse,dy=-p[1]*d[1]*s*pulse,x=cx+dx*Math.cos(rotation)-dy*Math.sin(rotation),y=cy+dx*Math.sin(rotation)+dy*Math.cos(rotation),a=.45+.35*(.5+.5*Math.sin(e*2.8+d[2]));ctx.fillStyle=`rgba(${{c[0]}},${{c[1]}},${{c[2]}},${{a}})`;ctx.beginPath();if(style==="stars"){{ctx.fillRect(x-d[3]*2,y-d[3]/2,d[3]*4,d[3]);ctx.fillRect(x-d[3]/2,y-d[3]*2,d[3],d[3]*4)}}else{{ctx.arc(x,y,d[3],0,Math.PI*2);ctx.fill()}}}}if(style==="outline"||style==="double"){{ctx.strokeStyle=`rgba(${{c[0]}},${{c[1]}},${{c[2]}},.9)`;ctx.lineWidth=2;for(const k of(style==="double"?[1,.76]:[1])){{ctx.beginPath();for(let i=0;i<=100;i++){{const p=heart(Math.PI*2*i/100),dx=p[0]*s*k*pulse,dy=-p[1]*s*k*pulse,x=cx+dx*Math.cos(rotation)-dy*Math.sin(rotation),y=cy+dx*Math.sin(rotation)+dy*Math.cos(rotation);i?ctx.lineTo(x,y):ctx.moveTo(x,y)}}ctx.stroke()}}}}requestAnimationFrame(draw)}}
 addEventListener("resize",resize);resize();requestAnimationFrame(draw);
 </script></body></html>'''
 
